@@ -2,7 +2,7 @@
 # Read deployment state; optionally verify a fresh backup in an independent database.
 set -euo pipefail
 mode="${1:-status}"
-case "$mode" in status|backup-drill) ;; *) exit 2 ;; esac
+case "$mode" in status|network|backup-drill) ;; *) exit 2 ;; esac
 cd /opt/agilecampus
 node=/opt/agilecampus-runtime/node/bin/node
 export APP_IMAGE="$("$node" -p 'JSON.parse(require("fs").readFileSync(".release.json","utf8")).image')"
@@ -23,6 +23,16 @@ free -m
 df -h /opt
 "${compose[@]}" exec -T db psql -U agilecampus -d agilecampus -At -c "select 'migrations',count(*) from drizzle.__drizzle_migrations union all select 'users',count(*) from users union all select 'projects',count(*) from projects union all select 'tasks',count(*) from tasks" </dev/null
 "${compose[@]}" logs --tail 25 edge reminders
+if test "$mode" = network; then
+  printf '\nRead-only server network inspection (no firewall changes):\n'
+  ss -lnt
+  if command -v ufw >/dev/null 2>&1; then ufw status verbose; fi
+  # iptables-save includes all Docker/NAT/source filters, but no credentials.
+  iptables-save
+  ip -4 route
+  ip -4 rule
+  for setting in net.ipv4.conf.all.rp_filter net.ipv4.conf.default.rp_filter; do sysctl "$setting"; done
+fi
 if test "$mode" = backup-drill; then
   dump="$("$node" scripts/ops.mjs backup)"
   [[ "$dump" == /opt/agilecampus/backups/agilecampus-*.dump ]]
