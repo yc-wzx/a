@@ -21,13 +21,13 @@ on:
         required: true
         default: status
         type: choice
-        options: [status, backup-drill]
+        options: [status, network, backup-drill]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ inputs.mode == 'status' && 'server-status' || 'server-deployment' }}
+  group: ${{ inputs.mode == 'backup-drill' && 'server-deployment' || 'server-status' }}
   cancel-in-progress: false
 
 jobs:
@@ -50,7 +50,7 @@ jobs:
           import ipaddress, os, re
           ipaddress.IPv4Address(os.environ['SERVER_IP'])
           assert re.fullmatch(r'[a-z_][a-z0-9_-]*', os.environ['SERVER_USER'])
-          assert os.environ['VERIFY_MODE'] in ('status', 'backup-drill')
+          assert os.environ['VERIFY_MODE'] in ('status', 'network', 'backup-drill')
           PY
           umask 077
           test -n "$DEPLOY_SSH_KEY"
