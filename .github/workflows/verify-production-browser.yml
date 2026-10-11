@@ -2,6 +2,15 @@ name: Verify public website in browser
 
 on:
   workflow_dispatch:
+    inputs:
+      origin:
+        description: Entrance to verify on the purchased server
+        required: true
+        default: https://47.242.210.133
+        type: choice
+        options:
+          - https://47.242.210.133
+          - https://agilecampus-47-242-210-133.sslip.io
 
 permissions:
   contents: read
@@ -26,7 +35,7 @@ jobs:
       - name: Verify registration, collaboration, schedule and mobile pages
         env:
           ALLOW_PRODUCTION_QA: 'true'
-          VERIFY_ORIGIN: https://47.242.210.133
+          VERIFY_ORIGIN: ${{ inputs.origin }}
           VERIFY_OUTPUT_DIR: ${{ runner.temp }}/browser-qa/result
         run: node "$RUNNER_TEMP/browser-qa/check.mjs"
       - name: Remove temporary account credentials

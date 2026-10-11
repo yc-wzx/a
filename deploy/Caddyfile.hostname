@@ -1,0 +1,30 @@
+# A DNS entrance plus the existing public IP certificate. Both use the same app.
+{
+	default_sni {$PUBLIC_IP}
+}
+
+https://{$DOMAIN} {
+	tls {
+		issuer acme {
+			dir {$ACME_CA}
+		}
+	}
+	encode zstd gzip
+	reverse_proxy app:3000
+}
+
+https://{$PUBLIC_IP} {
+	tls {
+		issuer acme {
+			dir {$ACME_CA}
+			profile shortlived
+		}
+	}
+	# Keep existing monitoring available; browsers continue on the DNS entrance.
+	handle /api/health {
+		reverse_proxy app:3000
+	}
+	handle {
+		redir https://{$DOMAIN}{uri} 302
+	}
+}

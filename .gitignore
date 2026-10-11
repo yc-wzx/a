@@ -48,4 +48,5 @@ next-env.d.ts
 /.agents/
 /.claude/launch.json
 .release.json
+.hostname.json
 backups/
