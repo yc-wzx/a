@@ -183,7 +183,7 @@ try {
   assert.equal(errors.length,0,`Browser errors: ${errors.join('; ')}`);
   completed=true;
 } finally {
-  fs.writeFileSync(path.join(dir,'production-verification.json'),JSON.stringify({origin,completed,verifiedAt:new Date().toISOString(),checks,browserErrors:errors},null,2));
+  fs.writeFileSync(path.join(dir,'production-verification.json'),JSON.stringify({origin,completed,verifiedAt:new Date().toISOString(),networkMode:process.env.QA_PROXY?'configured-proxy':'direct',runtimePlatform:process.platform,checks,browserErrors:errors},null,2));
   console.log(JSON.stringify({completed,completedChecks:checks, browserErrors:errors}));
   await browser.close();
 }
