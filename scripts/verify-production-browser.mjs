@@ -11,7 +11,7 @@ const dir = process.env.VERIFY_OUTPUT_DIR;
 if(!dir || !path.isAbsolute(dir)) throw Error('Set an absolute private VERIFY_OUTPUT_DIR');
 fs.mkdirSync(dir,{recursive:true,mode:0o700});
 const origin = process.env.VERIFY_ORIGIN;
-if(origin !== 'https://47.242.210.133') throw Error('This verification is scoped to the purchased AgileCampus server');
+if(!['https://47.242.210.133','https://agilecampus-47-242-210-133.sslip.io'].includes(origin)) throw Error('This verification is scoped to the purchased AgileCampus server');
 const file = path.join(dir, 'verification-account.private.json');
 let account;
 if (fs.existsSync(file)) account = JSON.parse(fs.readFileSync(file, 'utf8'));

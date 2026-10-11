@@ -1,0 +1,66 @@
+name: Configure server DNS entrance
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_ip:
+        description: Server public IPv4
+        required: true
+        type: string
+      server_user:
+        description: SSH user with passwordless sudo
+        required: true
+        default: admin
+        type: string
+      host_fingerprint:
+        description: Verified ED25519 SHA256 host fingerprint
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-deployment
+  cancel-in-progress: false
+
+jobs:
+  entrance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SERVER_IP: ${{ inputs.server_ip }}
+      SERVER_USER: ${{ inputs.server_user }}
+      EXPECTED_FINGERPRINT: ${{ inputs.host_fingerprint }}
+      CONFIGURATION_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate destination and change the entrance
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.AGILECAMPUS_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ipaddress, os, re
+          ipaddress.IPv4Address(os.environ['SERVER_IP'])
+          assert re.fullmatch(r'[a-z_][a-z0-9_-]*', os.environ['SERVER_USER'])
+          assert re.fullmatch(r'[0-9a-f]{40}', os.environ['CONFIGURATION_REVISION'])
+          PY
+          hostname="agilecampus-${SERVER_IP//./-}.sslip.io"
+          umask 077
+          test -n "$DEPLOY_SSH_KEY"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/agilecampus-key"
+          ssh-keyscan -T 15 -t ed25519 "$SERVER_IP" > "$RUNNER_TEMP/agilecampus-known-hosts"
+          actual="$(ssh-keygen -lf "$RUNNER_TEMP/agilecampus-known-hosts" | awk '{print $2}')"
+          test "$actual" = "$EXPECTED_FINGERPRINT"
+          options=(-i "$RUNNER_TEMP/agilecampus-key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/agilecampus-known-hosts" -o ConnectTimeout=20 -o ServerAliveInterval=15)
+          target="$SERVER_USER@$SERVER_IP"
+          ssh "${options[@]}" "$target" 'umask 077; mkdir -p .agilecampus-deploy'
+          scp "${options[@]}" scripts/configure-server-hostname.sh "$target:.agilecampus-deploy/"
+          ssh "${options[@]}" "$target" "sudo -n bash .agilecampus-deploy/configure-server-hostname.sh $hostname $SERVER_IP $CONFIGURATION_REVISION"
+          curl --fail --silent --show-error --max-time 20 "https://$hostname/api/health"
+          curl --fail --silent --show-error --max-time 20 "https://$hostname/login" > /dev/null
+          openssl s_client -connect "$SERVER_IP:443" -servername "$hostname" </dev/null 2>/dev/null | openssl x509 -noout -issuer -dates -ext subjectAltName
+      - name: Remove runner credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/agilecampus-key"

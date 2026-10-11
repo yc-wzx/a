@@ -80,6 +80,11 @@ function preflight() {
     env.CADDYFILE !== "./deploy/Caddyfile.ip"
   )
     throw Error("Public IP HTTPS requires CADDYFILE=./deploy/Caddyfile.ip");
+  if (
+    env.CADDYFILE === "./deploy/Caddyfile.hostname" &&
+    (url.protocol !== "https:" || isIP(url.hostname) || isIP(env.PUBLIC_IP ?? "") !== 4)
+  )
+    throw Error("DNS entrance requires an HTTPS hostname and PUBLIC_IP IPv4");
   run(["config", "--quiet"]);
   console.log("Preflight passed (secrets suppressed)");
 }
