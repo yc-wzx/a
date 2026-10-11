@@ -1,0 +1,401 @@
+{
+  "serverIp": "47.242.210.133",
+  "hostname": "agilecampus-47-242-210-133.sslip.io",
+  "collectedAt": "2026-10-11T04:26:49.653Z",
+  "timezone": "Asia/Shanghai",
+  "resolved": false,
+  "cloudFirewall": {
+    "source": "user screenshot 2026-10-11 12:19",
+    "allowedSource": "0.0.0.0/0",
+    "enabledPorts": [
+      22,
+      80,
+      443
+    ],
+    "icmpEnabled": true
+  },
+  "serverInspectionRun": "https://github.com/yc-wzx/agilecampus/actions/runs/38111287444",
+  "measurements": {
+    "http": {
+      "id": "26nhxC2pZyuzDMkWM00021ILi",
+      "createdAt": "2026-10-11T04:18:56.655Z",
+      "status": "finished",
+      "results": [
+        {
+          "country": "CN",
+          "city": "Guangzhou",
+          "asn": 4134,
+          "network": "Chinanet Backbone",
+          "status": "failed",
+          "resolvedAddress": "47.242.210.133",
+          "statusCode": null,
+          "timings": {
+            "total": 15000,
+            "dns": 193,
+            "tcp": null,
+            "tls": null,
+            "firstByte": null,
+            "download": null
+          },
+          "rawOutput": "Request timed out while establishing the TCP connection."
+        },
+        {
+          "country": "CN",
+          "city": "Nanjing",
+          "asn": 4134,
+          "network": "Chinanet Backbone",
+          "status": "failed",
+          "resolvedAddress": "47.242.210.133",
+          "statusCode": null,
+          "timings": {
+            "total": 15000,
+            "dns": 3212,
+            "tcp": null,
+            "tls": null,
+            "firstByte": null,
+            "download": null
+          },
+          "rawOutput": "Request timed out while establishing the TCP connection."
+        },
+        {
+          "country": "CN",
+          "city": "Changsha",
+          "asn": 4837,
+          "network": "CHINA UNICOM China169 Backbone",
+          "status": "failed",
+          "resolvedAddress": "47.242.210.133",
+          "statusCode": null,
+          "timings": {
+            "total": 15000,
+            "dns": 281,
+            "tcp": null,
+            "tls": null,
+            "firstByte": null,
+            "download": null
+          },
+          "rawOutput": "Request timed out while establishing the TCP connection."
+        },
+        {
+          "country": "CN",
+          "city": "Nanning",
+          "asn": 4837,
+          "network": "CHINA UNICOM China169 Backbone",
+          "status": "failed",
+          "resolvedAddress": "47.242.210.133",
+          "statusCode": null,
+          "timings": {
+            "total": 15001,
+            "dns": 402,
+            "tcp": null,
+            "tls": null,
+            "firstByte": null,
+            "download": null
+          },
+          "rawOutput": "Request timed out while establishing the TCP connection."
+        },
+        {
+          "country": "CN",
+          "city": "Kunming",
+          "asn": 9808,
+          "network": "China Mobile Communications Group",
+          "status": "failed",
+          "resolvedAddress": "47.242.210.133",
+          "statusCode": null,
+          "timings": {
+            "total": 15000,
+            "dns": 118,
+            "tcp": null,
+            "tls": null,
+            "firstByte": null,
+            "download": null
+          },
+          "rawOutput": "Request timed out while establishing the TCP connection."
+        },
+        {
+          "country": "CN",
+          "city": "Beijing",
+          "asn": 9808,
+          "network": "China Mobile Communications Group",
+          "status": "failed",
+          "resolvedAddress": "47.242.210.133",
+          "statusCode": null,
+          "timings": {
+            "total": 15002,
+            "dns": 181,
+            "tcp": null,
+            "tls": null,
+            "firstByte": null,
+            "download": null
+          },
+          "rawOutput": "Request timed out while establishing the TCP connection."
+        },
+        {
+          "country": "HK",
+          "city": "Hong Kong",
+          "asn": 45102,
+          "network": "Alibaba (US) Technology",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "statusCode": 200,
+          "timings": {
+            "total": 65,
+            "dns": 36,
+            "tcp": 3,
+            "tls": 11,
+            "firstByte": 14,
+            "download": 1
+          },
+          "tlsAuthorized": true,
+          "rawOutput": "HTTP/1.1 200\nAlt-Svc: h3=\":443\"; ma=2592000\nContent-Type: application/json\nDate: Sun, 11 Oct 2026 04:18:56 GMT\nVary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch\nVia: 1.1 Caddy\nConnection: close"
+        },
+        {
+          "country": "US",
+          "city": "Buffalo",
+          "asn": 36352,
+          "network": "HostPapa",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "statusCode": 200,
+          "timings": {
+            "total": 986,
+            "dns": 233,
+            "tcp": 225,
+            "tls": 290,
+            "firstByte": 238,
+            "download": 0
+          },
+          "tlsAuthorized": true,
+          "rawOutput": "HTTP/1.1 200\nAlt-Svc: h3=\":443\"; ma=2592000\nContent-Type: application/json\nDate: Sun, 11 Oct 2026 04:18:57 GMT\nVary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch\nVia: 1.1 Caddy\nConnection: close"
+        }
+      ]
+    },
+    "ping": {
+      "id": "2kDY7DKFxKYDJJutI00021ILi",
+      "createdAt": "2026-10-11T04:18:57.418Z",
+      "status": "finished",
+      "results": [
+        {
+          "country": "CN",
+          "city": "Guangzhou",
+          "asn": 4134,
+          "network": "Chinanet Backbone",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "timings": [],
+          "stats": {
+            "min": null,
+            "max": null,
+            "avg": null,
+            "total": 3,
+            "loss": 100,
+            "rcv": 0,
+            "drop": 3
+          },
+          "rawOutput": "PING 47.242.210.133 (47.242.210.133) 56(84) bytes of data.\nno answer yet for icmp_seq=1\nno answer yet for icmp_seq=2\n\n--- 47.242.210.133 ping statistics ---\n3 packets transmitted, 0 received, 100% packet loss, time 1004ms\n"
+        },
+        {
+          "country": "CN",
+          "city": "Dongguan",
+          "asn": 4134,
+          "network": "Chinanet Backbone",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "timings": [],
+          "stats": {
+            "min": null,
+            "max": null,
+            "avg": null,
+            "total": 3,
+            "loss": 100,
+            "rcv": 0,
+            "drop": 3
+          },
+          "rawOutput": "PING 47.242.210.133 (47.242.210.133) 56(84) bytes of data.\nno answer yet for icmp_seq=1\nno answer yet for icmp_seq=2\n\n--- 47.242.210.133 ping statistics ---\n3 packets transmitted, 0 received, 100% packet loss, time 1017ms\n"
+        },
+        {
+          "country": "CN",
+          "city": "Changsha",
+          "asn": 4837,
+          "network": "CHINA UNICOM China169 Backbone",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "timings": [],
+          "stats": {
+            "min": null,
+            "max": null,
+            "avg": null,
+            "total": 3,
+            "loss": 100,
+            "rcv": 0,
+            "drop": 3
+          },
+          "rawOutput": "PING 47.242.210.133 (47.242.210.133) 56(84) bytes of data.\nno answer yet for icmp_seq=1\nno answer yet for icmp_seq=2\n\n--- 47.242.210.133 ping statistics ---\n3 packets transmitted, 0 received, 100% packet loss, time 1023ms\n"
+        },
+        {
+          "country": "CN",
+          "city": "Wuhu",
+          "asn": 4837,
+          "network": "CHINA UNICOM China169 Backbone",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "timings": [],
+          "stats": {
+            "min": null,
+            "max": null,
+            "avg": null,
+            "total": 3,
+            "loss": 100,
+            "rcv": 0,
+            "drop": 3
+          },
+          "rawOutput": "PING 47.242.210.133 (47.242.210.133) 56(84) bytes of data.\nno answer yet for icmp_seq=1\nno answer yet for icmp_seq=2\n\n--- 47.242.210.133 ping statistics ---\n3 packets transmitted, 0 received, 100% packet loss, time 1009ms\n"
+        },
+        {
+          "country": "CN",
+          "city": "Kunming",
+          "asn": 9808,
+          "network": "China Mobile Communications Group",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "timings": [],
+          "stats": {
+            "min": null,
+            "max": null,
+            "avg": null,
+            "total": 3,
+            "loss": 100,
+            "rcv": 0,
+            "drop": 3
+          },
+          "rawOutput": "PING 47.242.210.133 (47.242.210.133) 56(84) bytes of data.\nno answer yet for icmp_seq=1\nno answer yet for icmp_seq=2\n\n--- 47.242.210.133 ping statistics ---\n3 packets transmitted, 0 received, 100% packet loss, time 1024ms\n"
+        },
+        {
+          "country": "CN",
+          "city": "Beijing",
+          "asn": 9808,
+          "network": "China Mobile Communications Group",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "timings": [],
+          "stats": {
+            "min": null,
+            "max": null,
+            "avg": null,
+            "total": 3,
+            "loss": 100,
+            "rcv": 0,
+            "drop": 3
+          },
+          "rawOutput": "PING 47.242.210.133 (47.242.210.133) 56(84) bytes of data.\nno answer yet for icmp_seq=1\nno answer yet for icmp_seq=2\n\n--- 47.242.210.133 ping statistics ---\n3 packets transmitted, 0 received, 100% packet loss, time 1017ms\n"
+        },
+        {
+          "country": "HK",
+          "city": "Hong Kong",
+          "asn": 61112,
+          "network": "AkileCloud Network",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "timings": [
+            {
+              "ttl": 54,
+              "rtt": 93.6
+            },
+            {
+              "ttl": 54,
+              "rtt": 92.4
+            },
+            {
+              "ttl": 54,
+              "rtt": 2.31
+            }
+          ],
+          "stats": {
+            "min": 2.308,
+            "max": 93.558,
+            "avg": 62.74,
+            "total": 3,
+            "loss": 0,
+            "rcv": 3,
+            "drop": 0
+          },
+          "rawOutput": "PING 47.242.210.133 (47.242.210.133) 56(84) bytes of data.\n64 bytes from 47.242.210.133: icmp_seq=1 ttl=54 time=93.6 ms\n64 bytes from 47.242.210.133: icmp_seq=2 ttl=54 time=92.4 ms\n64 bytes from 47.242.210.133: icmp_seq=3 ttl=54 time=2.31 ms\n\n--- 47.242.210.133 ping statistics ---\n3 packets transmitted, 3 received, 0% packet loss, time 1002ms\nrtt min/avg/max/mdev = 2.308/62.740/93.558/42.735 ms"
+        },
+        {
+          "country": "US",
+          "city": "Buffalo",
+          "asn": 36352,
+          "network": "HostPapa",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "timings": [
+            {
+              "ttl": 49,
+              "rtt": 240
+            },
+            {
+              "ttl": 49,
+              "rtt": 254
+            },
+            {
+              "ttl": 49,
+              "rtt": 250
+            }
+          ],
+          "stats": {
+            "min": 240.132,
+            "max": 253.943,
+            "avg": 248.174,
+            "total": 3,
+            "loss": 0,
+            "rcv": 3,
+            "drop": 0
+          },
+          "rawOutput": "PING 47.242.210.133 (47.242.210.133) 56(84) bytes of data.\n64 bytes from 47.242.210.133: icmp_seq=1 ttl=49 time=240 ms\n64 bytes from 47.242.210.133: icmp_seq=2 ttl=49 time=254 ms\n64 bytes from 47.242.210.133: icmp_seq=3 ttl=49 time=250 ms\n\n--- 47.242.210.133 ping statistics ---\n3 packets transmitted, 3 received, 0% packet loss, time 1001ms\nrtt min/avg/max/mdev = 240.132/248.174/253.943/5.863 ms"
+        }
+      ]
+    },
+    "mtr": {
+      "id": "2mh0vmjM0ebybNrps00021ILk",
+      "createdAt": "2026-10-11T04:20:47.761Z",
+      "status": "finished",
+      "results": [
+        {
+          "country": "CN",
+          "city": "Guangzhou",
+          "asn": 4134,
+          "network": "Chinanet Backbone",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "rawOutput": "Host                                         Loss% Drop Rcv    Avg  StDev  Javg \n 1. AS???    _gateway (10.0.0.1)              0.0%    0   3    0.6    0.0   0.3\n 2. AS???    192.168.1.1 (192.168.1.1)        0.0%    0   3    1.3    0.0   0.7\n 3. AS???    100.64.0.1 (100.64.0.1)          0.0%    0   3    4.0    0.8   2.4\n 4. AS140318 14.148.148.77 (14.148.148.77)   66.7%    2   1 4091.3    0.0 4091.3\n 5. AS140318 14.148.146.41 (14.148.146.41)   66.7%    2   1 3074.3    0.0 3074.3\n 6. AS???    (waiting for reply)           \n 7. AS4134   202.97.66.225 (202.97.66.225)    0.0%    0   3   10.0    0.3   5.3\n 8. AS4134   202.97.58.122 (202.97.58.122)    0.0%    0   3   14.2    1.6   8.5\n 9. AS???    (waiting for reply)           \n10. AS???    (waiting for reply)           \n11. AS???    47.246.116.53 (47.246.116.53)   66.7%    2   1   15.5    0.0  15.5\n12. AS749    26.25.157.105 (26.25.157.105)   33.3%    1   2 2062.7 2047.5 4095.1\n13. AS???    (waiting for reply)           \n"
+        },
+        {
+          "country": "CN",
+          "city": "Changsha",
+          "asn": 4837,
+          "network": "CHINA UNICOM China169 Backbone",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "rawOutput": "Host                                            Loss% Drop Rcv    Avg  StDev  Javg \n 1. AS???   _gateway (192.168.31.1)              0.0%    0   3    1.2    0.1   0.7\n 2. AS???   (waiting for reply)               \n 3. AS4837  58.20.125.137 (58.20.125.137)       66.7%    2   1    7.6    0.0   7.6\n 4. AS4837  58.20.126.233 (58.20.126.233)       33.3%    1   2 1540.4  530.4 1060.8\n 5. AS4837  219.158.22.33 (219.158.22.33)       66.7%    2   1 4126.8    0.0 4126.8\n 6. AS4837  219.158.103.218 (219.158.103.218)   66.7%    2   1 4105.4    0.0 4105.4\n 7. AS4837  219.158.4.130 (219.158.4.130)       66.7%    2   1 4104.6    0.0 4104.6\n 8. AS4837  219.158.6.122 (219.158.6.122)        0.0%    0   3   19.3    0.5   9.5\n 9. AS10099 103.239.176.122 (103.239.176.122)   33.3%    1   2 1556.1 1537.9 3075.8\n10. AS10099 202.77.18.193 (202.77.18.193)        0.0%    0   3   27.3    2.3  15.7\n11. AS???   61.14.203.42 (61.14.203.42)          0.0%    0   3 1724.2 1729.6 2545.6\n12. AS???   (waiting for reply)               \n"
+        },
+        {
+          "country": "CN",
+          "city": "Kunming",
+          "asn": 9808,
+          "network": "China Mobile Communications Group",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "rawOutput": "Host                                            Loss% Drop Rcv    Avg  StDev  Javg \n 1. AS???   _gateway (192.168.1.1)               0.0%    0   3    0.8    0.1   0.5\n 2. AS???   10.64.0.1 (10.64.0.1)                0.0%    0   3    7.0    3.6   6.2\n 3. AS9808  218.206.32.121 (218.206.32.121)     33.3%    1   2    5.5    1.7   3.3\n 4. AS9808  39.129.237.241 (39.129.237.241)     66.7%    2   1 3036.0    0.0 3036.0\n 5. AS9808  221.183.101.121 (221.183.101.121)   66.7%    2   1    4.1    0.0   4.1\n 6. AS???   (waiting for reply)               \n 7. AS9808  221.183.89.245 (221.183.89.245)     33.3%    1   2 1541.4 1508.5 3016.9\n 8. AS9808  221.183.92.22 (221.183.92.22)        0.0%    0   3 1391.9 1234.2 1045.9\n 9. AS9808  221.183.55.81 (221.183.55.81)       66.7%    2   1   39.5    0.0  39.5\n10. AS58453 223.120.2.77 (223.120.2.77)         66.7%    2   1 3078.0    0.0 3078.0\n11. AS58453 223.120.2.118 (223.120.2.118)       33.3%    1   2  553.5  505.7 1011.5\n12. AS58453 223.119.21.170 (223.119.21.170)      0.0%    0   3  714.2  478.5 1033.5\n13. AS???   (waiting for reply)               \n14. AS???   47.246.116.65 (47.246.116.65)       66.7%    2   1   32.3    0.0  32.3\n15. AS???   (waiting for reply)               \n"
+        },
+        {
+          "country": "HK",
+          "city": "Hong Kong",
+          "asn": 45102,
+          "network": "Alibaba (US) Technology",
+          "status": "finished",
+          "resolvedAddress": "47.242.210.133",
+          "rawOutput": "Host                                       Loss% Drop Rcv    Avg  StDev  Javg \n1. AS??? (waiting for reply)             \n2. AS??? 10.216.218.77 (10.216.218.77)      0.0%    0   3    1.5    0.1   0.9\n3. AS??? 10.54.60.226 (10.54.60.226)        0.0%    0   3 1370.6 1275.6 2041.4\n4. AS??? 26.25.157.153 (26.25.157.153)      0.0%    0   3 2385.4 1738.5 3576.1\n5. AS??? 11.73.12.94 (11.73.12.94)          0.0%    0   3    1.7    0.1   0.9\n6. AS??? 47.242.210.133 (47.242.210.133)    0.0%    0   3    2.3    0.1   1.2\n"
+        }
+      ]
+    }
+  }
+}

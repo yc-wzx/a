@@ -17,7 +17,7 @@ on:
         required: true
         type: string
       mode:
-        description: Read status or verify an independent backup restore
+        description: Inspect status/network rules or verify an independent backup restore
         required: true
         default: status
         type: choice
