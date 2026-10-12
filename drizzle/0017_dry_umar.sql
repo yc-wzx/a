@@ -1,0 +1,2 @@
+ALTER TABLE "document_comments" ADD COLUMN "reply_to_id" uuid;--> statement-breakpoint
+ALTER TABLE "document_comments" ADD CONSTRAINT "document_comments_reply_to_id_document_comments_id_fk" FOREIGN KEY ("reply_to_id") REFERENCES "public"."document_comments"("id") ON DELETE set null ON UPDATE no action;

@@ -23,6 +23,7 @@ export const PROJECT_NAV_GROUPS = [
     label: "协作",
     collapsible: true,
     items: [
+      { key: "documents", label: "项目文档", suffix: "/documents", icon: "documents" },
       {
         key: "announcements",
         label: "公告",

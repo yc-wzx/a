@@ -1,6 +1,8 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+import * as documentsSchema from "./documents-schema";
+import * as taskEnhancementsSchema from "./task-enhancements-schema";
 
 const globalForDb = globalThis as unknown as {
   dbClient?: ReturnType<typeof postgres>;
@@ -13,7 +15,7 @@ const client =
   postgres(process.env.DATABASE_URL!, { connection: { TimeZone: "UTC" } });
 if (process.env.NODE_ENV !== "production") globalForDb.dbClient = client;
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(client, { schema: { ...schema, ...documentsSchema, ...taskEnhancementsSchema } });
 
 // 事务连接类型：createTask/updateTask 等可选在事务内执行
 export type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];

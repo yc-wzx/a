@@ -58,6 +58,7 @@ import {
   type TaskLabel,
 } from "./task";
 import { runIdempotent } from "./write-request";
+import { notifyTaskWatchers } from "./task-watching";
 
 // C / P0：契约层。定稿 9.2 的 DTO 形状在这里落地，页面与 Agent API 都读这一份。
 // 本文件是 sprint_id -> iterationId 的**唯一**映射点：别处再存第二份归属即违反定稿。
@@ -557,6 +558,12 @@ export async function setTaskBlocked(
               milestoneId: updated.milestoneId,
               assigneeId: updated.assigneeId,
             },
+          });
+        if (changedState)
+          await notifyTaskWatchers(tx, actorId, { id: taskId, projectId, title: updated.title }, {
+            type: input.isBlocked ? "task.blocked" : "task.unblocked",
+            occurredAt: updated.updatedAt,
+            summary: `你关注的任务《${updated.title}》${input.isBlocked ? "被标记为阻塞" : "已解除阻塞"}`,
           });
         return { task: updated };
       },

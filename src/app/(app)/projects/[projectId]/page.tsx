@@ -20,6 +20,8 @@ import { FilterBar } from "./filter-bar";
 import { ProjectNav } from "@/components/projects/project-nav";
 import { ProjectLeadership } from "@/components/projects/project-leadership";
 import { getMyAiSettings } from "@/lib/agent/personal-settings";
+import { getProjectDoingLimit } from "@/lib/task-enhancements";
+import { ProjectDoingLimitControl } from "@/components/tasks/project-doing-limit";
 
 export default async function ProjectPage({
   params,
@@ -45,6 +47,7 @@ export default async function ProjectPage({
     dependencies,
     teamLabels,
     myAi,
+    doingLimit,
   ] = await Promise.all([
     listProjectMilestones(session.user.id, projectId),
     listProjectTasks(session.user.id, projectId),
@@ -52,6 +55,7 @@ export default async function ProjectPage({
     listProjectDependencies(session.user.id, projectId),
     listTeamLabels(session.user.id, project.teamId),
     getMyAiSettings(session.user.id),
+    getProjectDoingLimit(session.user.id, projectId),
   ]);
 
   const filters = parseFilters(
@@ -137,6 +141,7 @@ export default async function ProjectPage({
           visible={visibleTasks.length}
           total={projectTasks.length}
         />
+        <ProjectDoingLimitControl data={doingLimit} />
         <SavedProjectViews
           key={`${session.user.id}:${projectId}`}
           userId={session.user.id}

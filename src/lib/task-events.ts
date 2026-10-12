@@ -4,6 +4,7 @@ import { tasks, users } from "@/db/schema";
 import { recordProjectActivity } from "./activity";
 import { notifyTaskAssigned } from "./task-notifications";
 import { recordNotificationIntent } from "./notification";
+import { notifyTaskWatchers } from "./task-watching";
 
 type Task = typeof tasks.$inferSelect;
 const fields = [
@@ -123,6 +124,14 @@ export async function recordTaskMutation(
     task,
     previousAssigneeId: before?.assigneeId,
   });
+  if (before && before.status !== task.status) {
+    const labels = { todo: "待办", doing: "进行中", done: "已完成" };
+    await notifyTaskWatchers(tx, actorId, task, {
+      type: task.status === "done" ? "task.completed" : "task.status_changed",
+      occurredAt,
+      summary: `你关注的任务《${task.title}》已变为${labels[task.status]}`,
+    });
+  }
   if (
     before &&
     before.status !== "done" &&

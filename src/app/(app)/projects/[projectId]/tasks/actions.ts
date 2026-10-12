@@ -235,7 +235,7 @@ export async function getTaskPanelContextAction(
 
     return {
       panel,
-      canWrite: role === "admin" || role === "student",
+      canWrite: project.status !== "archived" && (role === "admin" || role === "student"),
       members: teamMembers.map((m) => ({ id: m.id, name: m.name })),
       milestones: milestones.map((m) => ({ id: m.id, name: m.title })),
       allTasks: projectTasks.map((t) => ({ id: t.id, title: t.title })),

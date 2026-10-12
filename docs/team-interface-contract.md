@@ -8,6 +8,8 @@
 
 ## 1. 先确定代码基线和实际状态
 
+2026-10-12 文档与任务协作的增量接口见 [本批交付](course-documents-20261012.md)、[`documents.ts`](../src/contracts/documents.ts) 和 [`task-enhancements.ts`](../src/contracts/task-enhancements.ts)。沿用已有 `Result<T>`／会话／幂等约定；不改变下列 P0–P2 名称。
+
 团队协作仓库：[yc-wzx/agilecampus](https://github.com/yc-wzx/agilecampus)。老师的 sdiver/agilecampus 是原始参考仓库。
 
 原定稿核对基线为 PR #1/#2 后的 `edfe765`；当前实现基线更新为 P0–P2 补齐 PR #10 后的 `7041e9a`，本轮另接入五项 P3。以后拉取最新 master，并在交接中写出实际提交号；本文件的核对状态不自动代表后续提交状态。

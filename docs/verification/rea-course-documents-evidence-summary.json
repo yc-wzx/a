@@ -1,0 +1,113 @@
+{
+  "schema": "AgileCampus REA finding summary, not canonical Evidence bundle",
+  "date": "2026-10-12",
+  "cli_version": "6.4.0",
+  "target_boundary": "Original published npm dist ESM + published source map + package metadata + license; no source repository checkout",
+  "execution_observed": false,
+  "commercial_platform_runtime_observed": false,
+  "records": [
+    {
+      "target": "collaboration",
+      "evidence_id": "ev_b931e1d0cd2335b92fcc607d46b7c6be6119d18fbe65dd47340ca253f6e7ae1b",
+      "operation": "analyze_javascript_application",
+      "authority": "shipped-artifact",
+      "root_sha256": "4990a8e1fde6637ef8312a715a3a23d58dd2c799fd2cc6fa27ff6784eafdc735",
+      "full_envelope_file_sha256": "4c00b62bb03a8571885928a9b60630f84d4e165d174c1c8b103628f767bb72ae",
+      "summary_view_id": "ev_8fa0c59dc97be67c88ba454db4e5e8f57335d831fc7e8366657e922e95c673f4",
+      "statistics": {
+        "relevant_files": 3,
+        "nested_asar_containers": 0,
+        "text_bytes_read": 24992,
+        "invalid_utf8_files": 0,
+        "parsed_javascript_files": 1,
+        "visited_ast_nodes": 863,
+        "findings": 23,
+        "modules": 0,
+        "parse_failures": 0
+      },
+      "application_coverage": {
+        "status": "complete",
+        "truncated": false,
+        "omitted_count": 0,
+        "limits": []
+      },
+      "semantic_coverage_status": "unknown",
+      "semantic_unknowns": null,
+      "limitations": [
+        "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+        "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+        "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+        "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+        "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+      ]
+    },
+    {
+      "target": "y-binding",
+      "evidence_id": "ev_bca9fc3822cbc08ecb5d5201c8712bbda6673547254cf3124e4eb1f5bed3a28d",
+      "operation": "analyze_javascript_application",
+      "authority": "shipped-artifact",
+      "root_sha256": "775ab19a141dbdb3c450c527fae6748ad3e210c7c2c104c74970d79307c489d4",
+      "full_envelope_file_sha256": "5afdc4d3d9dce2c424d1df954a067e74cc75ab6f9bdd638365f7f8baf4e41057",
+      "summary_view_id": "ev_91a7100a0a661e3f9a05e08455074362951bcc434d9bfa44d6a1cde36e5ebb7f",
+      "statistics": {
+        "relevant_files": 3,
+        "nested_asar_containers": 0,
+        "text_bytes_read": 252501,
+        "invalid_utf8_files": 0,
+        "parsed_javascript_files": 1,
+        "visited_ast_nodes": 9340,
+        "findings": 93,
+        "modules": 0,
+        "parse_failures": 0
+      },
+      "application_coverage": {
+        "status": "complete",
+        "truncated": false,
+        "omitted_count": 0,
+        "limits": []
+      },
+      "semantic_coverage_status": "unknown",
+      "semantic_unknowns": null,
+      "limitations": [
+        "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+        "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+        "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+        "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+        "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+      ]
+    }
+  ],
+  "trace": {
+    "evidence_id": "ev_9da968f8e20c7191ddc1c9db885478ff93eb1c2a8ca826822eae00b170660bf6",
+    "seed": {
+      "kind": "node-id",
+      "value": "jag_node_57eebd0ef165e4e8ea6660255398b99351d23161b78655d4b97eb8aec207eaa8",
+      "match": null,
+      "case_sensitive": false
+    },
+    "coverage": {
+      "status": "complete-within-source",
+      "source_graph_status": "complete",
+      "total_seed_matches": 1
+    },
+    "source_evidence_id": "ev_b931e1d0cd2335b92fcc607d46b7c6be6119d18fbe65dd47340ca253f6e7ae1b",
+    "direction": "outgoing",
+    "summary": {
+      "matched_seeds": 1,
+      "traced_nodes": 13,
+      "traced_edges": 22,
+      "terminal_paths": 0,
+      "native_handoffs": 0,
+      "observed_facts": 7,
+      "inferred_facts": 42,
+      "unknown_facts": 0,
+      "unavailable_facts": 0
+    }
+  },
+  "limitations": [
+    "Static code and relationships are not execution evidence.",
+    "Complete application graph is bounded to inventoried published files; external dependencies remain unresolved.",
+    "HTTP transport, ACL, comments, snapshots, recycle bin and personal AI are AgileCampus design choices, not recovered commercial platform internals."
+  ],
+  "full_evidence_location": "Local .codex/tmp/agilecampus-aliyun/rea-course-documents-20261012/ outside repository"
+}

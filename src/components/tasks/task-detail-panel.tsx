@@ -19,6 +19,8 @@ import {
 import type { TaskSummary } from "@/contracts/p0-p2";
 import { newRequestId } from "@/lib/request-id";
 import { TaskComments } from "@/components/task-comments";
+import { TaskEnhancementSection } from "./task-enhancements";
+import { TaskDocumentLinks } from "@/components/documents/task-document-links";
 
 // C / P0：任务详情侧边栏。取代原先卡片里的居中弹窗 EditModal。
 //
@@ -273,6 +275,8 @@ export function TaskDetailPanel({
 
         {task && local && (
           <div className="space-y-5">
+            <TaskEnhancementSection key={taskId} projectId={projectId} taskId={taskId} onSaved={onSaved} />
+            <TaskDocumentLinks key={`docs-${taskId}`} projectId={projectId} taskId={taskId} />
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
               <Meta label="状态" value={STATUS_LABEL[task.status]} />
               <Meta label="优先级" value={task.priority} />
