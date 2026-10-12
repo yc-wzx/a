@@ -1,0 +1,19 @@
+{
+  "origin": "https://weidu-agilecampus.pw",
+  "production": true,
+  "accessedViaProxy": true,
+  "checkedAt": "2026-10-12T12:49:56.892Z",
+  "checks": [
+    "Grouped sidebar highlights nested routes and keeps existing collaboration entries usable",
+    "Named view saves list and sort settings, survives reload and supports renaming",
+    "List and Gantt share one task detail panel; filter changes and resets preserve the selected view",
+    "Existing timeline URL redirects to Gantt without dropping filters",
+    "Workload shows actual task counts, explains counting and links to member-filtered tasks",
+    "Project sidebar, list and workload fit 1440 and 1366 desktop viewports",
+    "Deleting a saved view removes preferences only",
+    "Non-members cannot see project navigation or workload",
+    "No browser runtime errors and no server task data changed"
+  ],
+  "runtimeErrors": [],
+  "result": "passed"
+}

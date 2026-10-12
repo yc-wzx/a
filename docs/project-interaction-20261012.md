@@ -35,4 +35,4 @@
 
 运行 `scripts/verify-project-interaction.mjs` 时必须显式指定受支持的网址、私有输出目录和既有验收账号文件；生产模式额外要求 ALLOW_PRODUCTION_QA=true。该脚本不创建生产账号、任务或项目，保存／删除的仅是测试浏览器的视图设置。
 
-正式域名仍为 [weidu-agilecampus.pw](https://weidu-agilecampus.pw)，上线记录将在发布验证后补充。
+2026-10-12 20:48（北京时间）已上线至 [weidu-agilecampus.pw](https://weidu-agilecampus.pw)。线上新增交互 9 项、既有业务 24 项，共 33 项检查通过；自动化通过既有代理执行，不代表重新验证了校园网直连。源码、镜像、备份和验证记录见 [本轮上线验收](project-interaction-live-20261012.md)。刷新网站、进入自己的项目即可使用。
