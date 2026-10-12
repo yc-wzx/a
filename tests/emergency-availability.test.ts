@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockLanguageModelV2 } from "ai/test";
 import { db } from "@/db";
 import {
@@ -38,6 +38,12 @@ import { resetDb } from "./helpers";
 import { hashRequest } from "@/lib/write-request";
 
 const now = new Date("2026-10-12T00:00:00Z");
+// 固定日期即可；保留真实网络计时器，让 PostgreSQL 操作正常执行。
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
+});
+afterEach(() => vi.useRealTimers());
 const range = { startDate: "2026-10-12", days: 7 as const };
 const secret = {
   title: "不公开的就医原因",
@@ -116,15 +122,13 @@ describe("自愿共享模糊日程", () => {
     const s = await scene(),
       requestId = randomUUID();
     const oldInput = { requestId, source: "csv" as const, events: [secret] };
-    await db
-      .insert(personalScheduleRequests)
-      .values({
-        userId: s.student.id,
-        operation: "events.import",
-        requestId,
-        requestHash: hashRequest(oldInput),
-        result: { added: 1, skipped: 0, revision: 1 },
-      });
+    await db.insert(personalScheduleRequests).values({
+      userId: s.student.id,
+      operation: "events.import",
+      requestId,
+      requestHash: hashRequest(oldInput),
+      result: { added: 1, skipped: 0, revision: 1 },
+    });
     expect(await importMySchedule(s.student.id, oldInput)).toEqual({
       added: 1,
       skipped: 0,

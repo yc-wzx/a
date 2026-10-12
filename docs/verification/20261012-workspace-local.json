@@ -1,0 +1,20 @@
+{
+  "origin": "http://localhost:3099",
+  "desktopOnly": true,
+  "exampleData": true,
+  "checks": [
+    "Desktop workspace renders four real summary cards and two columns",
+    "1440 and 1366 desktop layouts fit without horizontal scrolling",
+    "Task search has an explanatory empty state and reversible reset",
+    "Task list expands beyond the first eight without losing rows",
+    "Deadline and project filters show only matching personal assignments",
+    "Personal schedule privacy, archived task exclusion and exact feedback links",
+    "Open-source command menu supports Ctrl K, Chinese search and keyboard navigation",
+    "Escape closes command menu and restores trigger focus",
+    "Refresh exposes completion feedback",
+    "Focus action opens the existing real task detail workflow",
+    "Second account receives its own schedule and accessible empty project state",
+    "No uncaught browser errors"
+  ],
+  "errors": []
+}
