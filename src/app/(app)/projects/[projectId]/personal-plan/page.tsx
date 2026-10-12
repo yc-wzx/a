@@ -10,6 +10,7 @@ import {
 } from "@/lib/schedule/planner";
 import { shanghaiDay } from "@/lib/schedule/types";
 import { ProjectNav } from "@/components/projects/project-nav";
+import { getMyAiSettings } from "@/lib/agent/personal-settings";
 import {
   PersonalPlanGenerator,
   PersonalPlanControls,
@@ -35,6 +36,7 @@ export default async function Page({
   if (!z.uuid().safeParse(projectId).success) notFound();
   const access = await getProjectForUser(session.user.id, projectId);
   if (!access) notFound();
+  const aiSettings=await getMyAiSettings(session.user.id);
   const seed = sp.replan
     ? await getReplanningSeed(session.user.id, projectId, sp.replan)
     : undefined;
@@ -106,7 +108,7 @@ export default async function Page({
           candidates={workspace.candidates}
           total={workspace.candidateTotal}
           requestId={randomUUID()}
-          aiAvailable={!!process.env.DEEPSEEK_API_KEY}
+          aiAvailable={aiSettings.configured}
           seed={seed}
         />
       ) : (

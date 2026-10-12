@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       actorId: session.user.id,
       projectId: parsed.data.projectId,
       userText: parsed.data.userText,
-      scope: parsed.data.scope,
+      scope: parsed.data.scope ?? "personal",
       conversationId: parsed.data.conversationId,
     });
     return NextResponse.json(result);
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     if (e instanceof AppError)
       return NextResponse.json({ error: e.message }, { status: 400 });
     // 未预期错误（含 DeepSeek 超时/失败）：服务端留痕，对客户端只呈通用消息，不暴露内部细节
-    console.error("[/api/chat] runAgentTurn 失败:", e);
+    console.error("[/api/chat] runAgentTurn 失败:", e instanceof Error ? e.name : "UnknownError");
     return NextResponse.json({ error: "对话失败，请重试" }, { status: 500 });
   }
 }

@@ -16,6 +16,7 @@ import {
   IterationDraftGenerator,
 } from "@/components/iteration-draft-editor";
 import { ChatPanel } from "../chat-panel";
+import { getMyAiSettings } from "@/lib/agent/personal-settings";
 export default async function Page({
   params,
   searchParams,
@@ -30,14 +31,14 @@ export default async function Page({
   if (!z.uuid().safeParse(projectId).success) notFound();
   const access = await getProjectForUser(session.user.id, projectId);
   if (!access) notFound();
-  const scope = sp.scope === "personal" ? "personal" : "project",
+  const scope = sp.scope === "project" ? "project" : "personal",
     offset = Math.max(0, Number(sp.offset) || 0),
     conversation = await getOrCreateScopedConversation(
       session.user.id,
       projectId,
       { scope },
     );
-  const [history, drafts, pool, members, milestones] = await Promise.all([
+  const [history, drafts, pool, members, milestones, myAi] = await Promise.all([
     listBoundedConversationMessages(session.user.id, conversation.id, {
       beforeMessageId: z.uuid().safeParse(sp.beforeMessageId).success
         ? sp.beforeMessageId
@@ -47,6 +48,7 @@ export default async function Page({
     listBacklog(session.user.id, projectId, { limit: 100 }),
     listTeamMembers(access.project.teamId),
     listProjectMilestones(session.user.id, projectId),
+    getMyAiSettings(session.user.id),
   ]);
   return (
     <main className="mx-auto max-w-5xl space-y-5 py-8">
@@ -73,6 +75,7 @@ export default async function Page({
         </nav>
       </header>
       <ChatPanel
+        assistantName={myAi.assistantName}
         key={`${conversation.id}:${sp.beforeMessageId ?? ""}`}
         projectId={projectId}
         conversationId={conversation.id}

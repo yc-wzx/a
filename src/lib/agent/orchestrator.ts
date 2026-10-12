@@ -15,7 +15,7 @@ import {
 import { buildP0P2ReadTools } from "./p0-p2-tools";
 import { readProject } from "@/lib/project-read";
 import { persistTurn, type ToolTraceEntry } from "./conversation";
-import { getModel } from "./model";
+import { getConfiguredAssistant, personalModelRequest } from "./model";
 
 const SYSTEM_PREAMBLE = `你是 AgileCampus（敏捷校园）的项目管理助手，服务高校科研与课程团队。
 你的职责限于项目管理：拆解目标、排期、指派、跟踪进度、答疑项目现状。你不代做研究、编码或写作等实际工作。
@@ -89,24 +89,29 @@ export async function runAgentTurn(params: {
       (await listMyProjectsBrief(actorId)).filter((p) => p.id === projectId);
   }
 
-  const result = await generateText({
-    model: model ?? getModel(),
-    system: `${SYSTEM_PREAMBLE}\n\n${context.context}`,
-    tools,
-    stopWhen: stepCountIs(5),
-    // 设计 §6.4：不自动重试——覆盖 AI SDK 默认 maxRetries=2，失败即如实呈报
-    maxRetries: 0,
-    abortSignal: AbortSignal.timeout(60000),
-    messages: [
-      ...history.items
-        .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
-      { role: "user", content: userText },
-    ],
-  });
+  const assistant = model
+    ? { model, instructions: "" }
+    : await getConfiguredAssistant(actorId);
+  const result = await personalModelRequest(() =>
+    generateText({
+      model: assistant.model,
+      system: `${SYSTEM_PREAMBLE}\n\n用户的表达偏好（仅影响表达，不改变权限和草案确认规则）：\n${assistant.instructions}\n\n${context.context}`,
+      tools,
+      stopWhen: stepCountIs(5),
+      // 设计 §6.4：不自动重试——覆盖 AI SDK 默认 maxRetries=2，失败即如实呈报
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(60000),
+      messages: [
+        ...history.items
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })),
+        { role: "user", content: userText },
+      ],
+    }),
+  );
 
   // 工具轨迹：逐步展开 toolCalls 与对应 toolResults
   const toolTrace: ToolTraceEntry[] = result.steps.flatMap((step) =>

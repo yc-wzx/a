@@ -175,6 +175,9 @@ describe("周报、透明风险、统一证据及工作台聚合", () => {
       });
     await updateTask(s.admin.id, task.id, { status: "done" });
     await updateTask(s.admin.id, task.id, { status: "doing" });
+    // Task mutation timestamps come from PostgreSQL, whose clock is not mocked by vi.setSystemTime.
+    // Place this historical fixture in the report's week independently of the day the test runs.
+    await db.update(projectActivities).set({occurredAt:new Date("2026-10-09T10:00:00+08:00")}).where(eq(projectActivities.projectId,s.project.id));
     const report = await getWeeklyReport(s.member.id, s.project.id, {
       weekStart: "2026-10-05",
     });

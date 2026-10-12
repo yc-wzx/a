@@ -2,6 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/lib/auth";
 import { NotificationNav } from "@/components/notification-nav";
+import {
+  GettingStartedHint,
+  QuickstartTour,
+} from "@/components/quickstart-tour";
 
 export default async function AppLayout({
   children,
@@ -35,28 +39,53 @@ export default async function AppLayout({
             </Link>
             <Link
               href="/projects"
+              data-tour="projects"
               className="whitespace-nowrap rounded-field px-2.5 py-1.5 text-sm text-ink-soft transition-colors hover:bg-primary-soft hover:text-primary"
             >
               项目
             </Link>
             <Link
               href="/teams"
+              data-tour="teams"
               className="whitespace-nowrap rounded-field px-2.5 py-1.5 text-sm text-ink-soft transition-colors hover:bg-primary-soft hover:text-primary"
             >
               团队
             </Link>
             <NotificationNav actorId={session.user.id} />
+            <Link
+              href="/help"
+              className="whitespace-nowrap rounded-field px-2.5 py-1.5 text-sm text-ink-soft hover:bg-primary-soft"
+            >
+              新手教程
+            </Link>
+            <QuickstartTour />
           </nav>
         </div>
-        <details className="relative shrink-0">
-          <summary aria-label="账户菜单" className="flex cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-field px-2 py-1.5 text-sm text-ink-soft transition-colors hover:bg-primary-soft hover:text-primary [&::-webkit-details-marker]:hidden">
+        <details data-tour="account" className="relative shrink-0">
+          <summary
+            aria-label="账户菜单"
+            className="flex cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-field px-2 py-1.5 text-sm text-ink-soft transition-colors hover:bg-primary-soft hover:text-primary [&::-webkit-details-marker]:hidden"
+          >
             <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-xs font-semibold text-white">
               {session.user.name?.slice(0, 1) ?? "?"}
             </span>
-            <span className="hidden max-w-40 truncate sm:inline">{session.user.name}</span>
+            <span className="hidden max-w-40 truncate sm:inline">
+              {session.user.name}
+            </span>
           </summary>
           <div className="absolute right-0 z-30 mt-1 w-40 space-y-1 rounded-field border border-line bg-surface p-1 shadow-pop">
-            <Link href="/schedule" className="block rounded px-3 py-2 text-sm text-ink-soft transition-colors hover:bg-primary-soft hover:text-primary">我的课表与日程</Link>
+            <Link
+              href="/help"
+              className="block rounded px-3 py-2 text-sm text-ink-soft hover:bg-primary-soft"
+            >
+              新手教程
+            </Link>
+            <Link
+              href="/schedule"
+              className="block rounded px-3 py-2 text-sm text-ink-soft transition-colors hover:bg-primary-soft hover:text-primary"
+            >
+              我的课表与日程
+            </Link>
             <Link
               href="/settings"
               className="block rounded px-3 py-2 text-sm text-ink-soft transition-colors hover:bg-primary-soft hover:text-primary"
@@ -82,7 +111,10 @@ export default async function AppLayout({
           </div>
         </details>
       </header>
-      <div className="mx-auto max-w-5xl p-6">{children}</div>
+      <div className="mx-auto max-w-5xl p-6">
+        <GettingStartedHint userId={session.user.id} />
+        {children}
+      </div>
     </div>
   );
 }
