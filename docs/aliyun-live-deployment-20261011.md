@@ -1,6 +1,6 @@
 # 唯笃队 AgileCampus 上线与维护说明
 
-更新：2026-10-12。AgileCampus 应用网站已经部署；腾讯文档团队项目主页继续独立使用。新手教程、删除和个人 AI 的发布及 42 项电脑端检查见 [最新上线验收](quickstart-live-20261012.md)。正式域名与 Cloudflare Tunnel 的验证及维护见 [固定入口说明](cloudflare-fixed-entrance-20261012.md)；下方的首次部署和旧入口排查保留日期，不把历史结果当作当前入口状态。
+更新：2026-10-12 19:33。AgileCampus 应用网站已经部署；腾讯文档团队项目主页继续独立使用。当前工作台交互改进及 31 项线上电脑检查见 [最新上线验收](workspace-live-20261012.md)。教程、删除和个人 AI 的首次发布记录见 [此前验收](quickstart-live-20261012.md)。正式域名与 Cloudflare Tunnel 的验证及维护见 [固定入口说明](cloudflare-fixed-entrance-20261012.md)；下方的首次部署和旧入口排查保留日期，不把历史结果当作当前入口状态。
 
 ## 现在怎么用
 
@@ -25,10 +25,10 @@
 | 服务器 | 阿里云香港轻量应用服务器 |
 | 规格 | 2 核、2 GiB、40 GiB；已启用小内存运行配置与日志轮转 |
 | 系统 | Ubuntu 24.04，x86_64 |
-| 应用源码版本 | `1594145cb52862e5d6cd064983106f5832937ee1` |
+| 应用源码版本 | `a380dc80a4bef02d17b24d425a68c83b24b92447` |
 | 固定入口 | `weidu-agilecampus.pw`，正式 Cloudflare Tunnel；保留原数据库容器 |
-| 应用镜像 | `agilecampus:release-1594145cb528` |
-| 迁移镜像 | `agilecampus:migrate-1594145cb528` |
+| 应用镜像 | `agilecampus:release-a380dc80a4be` |
+| 迁移镜像 | `agilecampus:migrate-a380dc80a4be` |
 | 数据库 | PostgreSQL 16，16 条版本化迁移完成 |
 | 运行服务 | 应用、数据库、后台提醒、Caddy HTTPS 代理 |
 | 应用目录 | `/opt/agilecampus` |
