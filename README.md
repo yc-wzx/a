@@ -41,6 +41,8 @@
 
 工作台新增查询的项目卡片显示含子任务的真实完成数，迭代仍按主任务计算，页面明确区分两种口径。实际复用 cmdk 和 Lucide，参考 shadcn/ui 的信息层次；实现、开源取舍和课程试用建议见 [工作台交互改进说明](docs/workspace-interaction-20261012.md)。
 
+工作台本轮完整回归 **688 项通过、2 项跳过**，生产构建和 TypeScript 通过，12 项本地电脑交互检查通过；真实同学试用另外记录。
+
 完整入口与接口交接见 [P0–P2 补齐说明](docs/p0-p2-completion.md)、[五项 P3 接入说明](docs/p3-project-extensions.md)和 [本轮课表规划说明](docs/p3-personal-schedule-planning.md)；逐条状态见 [六人最新进度](docs/team-progress-20261009.md)；固定接口以 [契约 v2.0 与 P3 增量接口](docs/team-interface-contract.md) 为准。其他 P3 候选和 P4 没有记作完成。
 
 ## 主要入口
