@@ -6,6 +6,8 @@
 
 ## 团队新增功能
 
+**2026-10-12 本批新增：任务检查清单、进行中数量提醒、任务关注通知、资料关联，以及项目在线文档。** 文档支持协作编辑、段落评论与回复、版本比较恢复、目录搜索、任务关联、阅读／评论／编辑权限、个人草稿、Markdown 导入导出、打印、回收站和个人 AI 选区预览。操作、3–4 人试用和未选项见 [本批交付说明](docs/course-documents-20261012.md)，开源及 REA 依据见 [分析报告](docs/rea-course-documents-20261012.md)。
+
 | 功能 | 用户可以做什么 |
 |---|---|
 | 任务三视图【2026-10-12 新增，候选 1】 | 看板、列表、甘特图切换，共用筛选和任务详情；列表按截止日期／优先级／标题排序，旧时间线地址继续有效 |
@@ -67,6 +69,8 @@
 | /projects/{id}/deliverables | 成果列表／创建；详情含版本、审核、重交和反馈任务 |
 | /projects/{id}/deliverables/{deliverableId}/compare | 两个正式成果版本的内容对比 |
 | /projects/{id}/references | 会议、纪要、录制及其他资料链接 |
+| /projects/{id}/documents | 文档目录、标题／正文搜索、Markdown 导入与回收站 |
+| /projects/{id}/documents/{documentId} | 在线协作、评论回复、版本、关联任务、权限及个人 AI |
 | /api/projects/{id}/calendar | 登录后下载截止日期日历；项目导航有导出按钮 |
 | /projects/{id}/announcements | 公告列表和管理 |
 | /projects/{id}/reports | 规则周报与下载 |

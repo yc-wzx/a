@@ -95,6 +95,9 @@ const TITLES: Record<string, string> = {
   "comment.mentioned": "评论中提及你",
   "announcement.published": "项目公告",
   "task.completed": "任务已完成",
+  "task.status_changed": "关注任务状态变化",
+  "task.blocked": "关注任务被阻塞",
+  "task.unblocked": "关注任务解除阻塞",
   "task.due_soon": "任务即将到期",
   "task.overdue": "任务逾期提醒",
 };

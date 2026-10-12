@@ -15,6 +15,7 @@ import {
   History,
   ChevronDown,
   ArrowLeft,
+  FileText,
 } from "lucide-react";
 import { CalendarDownload } from "@/app/(app)/projects/[projectId]/extras/calendar-download";
 import {
@@ -33,6 +34,7 @@ const icons = {
   deliverables: PackageCheck,
   reports: NotebookPen,
   evidence: History,
+  documents: FileText,
 };
 export function ProjectSidebar({
   projectId,
