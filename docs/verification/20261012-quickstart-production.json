@@ -1,0 +1,22 @@
+{
+  "origin": "https://weidu-agilecampus.pw",
+  "completed": true,
+  "verifiedAt": "2026-10-12T09:09:39.251Z",
+  "networkMode": "configured-proxy",
+  "checks": [
+    "Register and log in a private example account",
+    "Dismissed quickstart hint survives reload",
+    "Help presents all three roles with actionable steps",
+    "Chinese page tour opens, advances and closes without changing business data",
+    "Canceling deletion keeps the milestone",
+    "Milestone deletion shows impact and preserves linked task after reload",
+    "Existing task-detail deletion works with explicit subtask warning",
+    "Personal settings save, clear entered key and never echo it in HTML",
+    "Assistant uses the personal name and defaults to a private conversation",
+    "Second account has independent empty AI settings",
+    "Deleting own AI configuration persists and leaves the project accessible",
+    "Rule planning remains available without personal AI settings"
+  ],
+  "browserErrors": [],
+  "realAiProviderTested": false
+}
