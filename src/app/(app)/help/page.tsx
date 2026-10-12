@@ -73,6 +73,23 @@ export default function HelpPage() {
         </section>
       ))}
       <section className="ac-card space-y-3 p-5">
+        <h2 className="font-semibold">进入项目后怎么找功能</h2>
+        <ol className="list-decimal space-y-2 pl-5 text-sm leading-6">
+          <li>
+            左侧栏中打开概览、任务和迭代；公告、会议资料、个人助手在「协作」，成果、周报和过程证据在「成果与记录」，点击分区可展开。
+          </li>
+          <li>
+            任务页切换看板、列表或甘特图。筛选条件共用；在任一视图点击任务可打开同一个详情面板，列表可以按截止日期、优先级或标题排序。
+          </li>
+          <li>
+            筛选好后展开「常用筛选」，起名并保存。之后选中名称、点击应用；也可以重命名或删除。仅当前账号、当前项目和当前浏览器保留，更换设备不会同步。
+          </li>
+          <li>
+            在概览查看「成员工作量」，展开成员查看待处理任务，点击「查看此成员的全部任务」进入筛选后的列表。这里只统计实际任务数，主任务和子任务各计一条，不是贡献评分。
+          </li>
+        </ol>
+      </section>
+      <section className="ac-card space-y-3 p-5">
         <h2 className="font-semibold">四个词就够了</h2>
         <dl className="grid grid-cols-[5rem_1fr] gap-x-3 gap-y-3 text-sm">
           <dt className="font-medium">项目</dt>

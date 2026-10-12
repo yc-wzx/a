@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ActivityFeed } from "@/components/activity/activity-feed";
 import { MyProjectTodos } from "@/components/activity/my-project-todos";
 import { ProjectNav } from "@/components/projects/project-nav";
+import { MemberWorkloadPanel } from "@/components/projects/member-workload";
 import { ProjectLeadership } from "@/components/projects/project-leadership";
 import { ProjectAnnouncement } from "@/components/project-announcement";
 import { ProjectRisks } from "@/components/project-risks";
@@ -159,6 +160,11 @@ export default async function ProjectOverviewPage({
       </section>
 
       {/* 公告栏：本人待办 + 项目动态（E）。两块各自独立降级，互不影响 */}
+      <MemberWorkloadPanel
+        actorId={session.user.id}
+        projectId={projectId}
+        today={todayInShanghai()}
+      />
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
         {myTodos.state === "ready" ? (
           <MyProjectTodos items={myTodos.data} today={todayInShanghai()} />

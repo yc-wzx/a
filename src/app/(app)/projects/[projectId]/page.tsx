@@ -12,7 +12,9 @@ import { listTeamLabels } from "@/lib/label";
 import { parseFilters, applyFilters } from "@/lib/board-filters";
 import { MilestoneSection } from "./milestone-section";
 import { NewTaskForm } from "./new-task-form";
-import { Board } from "./board";
+import { TaskWorkspace } from "./task-workspace";
+import { SavedProjectViews } from "@/components/projects/saved-project-views";
+import { todayInShanghai } from "@/lib/dashboard";
 import { ChatPanel } from "./chat-panel";
 import { FilterBar } from "./filter-bar";
 import { ProjectNav } from "@/components/projects/project-nav";
@@ -36,15 +38,21 @@ export default async function ProjectPage({
   if (!access) notFound();
   const { project, role } = access;
 
-  const [projectMilestones, projectTasks, members, dependencies, teamLabels, myAi] =
-    await Promise.all([
-      listProjectMilestones(session.user.id, projectId),
-      listProjectTasks(session.user.id, projectId),
-      listTeamMembers(project.teamId),
-      listProjectDependencies(session.user.id, projectId),
-      listTeamLabels(session.user.id, project.teamId),
-      getMyAiSettings(session.user.id),
-    ]);
+  const [
+    projectMilestones,
+    projectTasks,
+    members,
+    dependencies,
+    teamLabels,
+    myAi,
+  ] = await Promise.all([
+    listProjectMilestones(session.user.id, projectId),
+    listProjectTasks(session.user.id, projectId),
+    listTeamMembers(project.teamId),
+    listProjectDependencies(session.user.id, projectId),
+    listTeamLabels(session.user.id, project.teamId),
+    getMyAiSettings(session.user.id),
+  ]);
 
   const filters = parseFilters(
     new URLSearchParams(
@@ -53,11 +61,11 @@ export default async function ProjectPage({
       ),
     ),
   );
-  // 「今日」在服务端按本地时区取 YYYY-MM-DD，随后仅作字符串比较
-  const today = new Date().toLocaleDateString("sv-SE");
+  const today = todayInShanghai();
   const visibleTasks = applyFilters(projectTasks, filters, today);
 
-  const canWrite = role === "admin" || role === "student";
+  const canWrite =
+    (role === "admin" || role === "student") && project.status !== "archived";
   const isAdmin = role === "admin";
 
   // 详情侧边栏由 URL 的 ?task= 驱动，但**取数在面板自己手里**（定稿 9.2 侧边栏契约）：
@@ -90,8 +98,14 @@ export default async function ProjectPage({
           <p className="mt-1 text-sm text-ink-soft">{project.description}</p>
         )}
         <p className="mt-1 text-xs text-ink-faint">
-          {project.startDate ?? "?"} ~ {project.endDate ?? "?"} ·{" "}
-          {project.status}
+          {project.startDate ?? "开始日期未设置"} ~{" "}
+          {project.endDate ?? "结束日期未设置"} ·{" "}
+          {{
+            planning: "规划中",
+            active: "进行中",
+            completed: "已完成",
+            archived: "已归档",
+          }[project.status] ?? project.status}
         </p>
       </header>
 
@@ -109,8 +123,10 @@ export default async function ProjectPage({
       />
 
       <section className="space-y-3" data-tour="board">
-        <h2 className="font-medium text-ink">看板</h2>
-        <p className="text-xs text-ink-soft">点击任务卡片打开详情，可查看、修改或删除任务。删除主任务会同时删除其子任务；老师角色只读。</p>
+        <h2 className="font-medium text-ink">项目任务</h2>
+        <p className="text-xs text-ink-soft">
+          在看板、列表或甘特图中点击任务打开详情，可查看、修改或删除。删除主任务会同时删除其子任务；老师角色只读。
+        </p>
         <FilterBar
           members={members.map((m) => ({ id: m.id, name: m.name }))}
           milestones={projectMilestones.map((m) => ({
@@ -121,8 +137,14 @@ export default async function ProjectPage({
           visible={visibleTasks.length}
           total={projectTasks.length}
         />
-        <Board
+        <SavedProjectViews
+          key={`${session.user.id}:${projectId}`}
+          userId={session.user.id}
           projectId={projectId}
+        />
+        <TaskWorkspace
+          projectId={projectId}
+          today={today}
           groupBy={filters.group}
           tasks={visibleTasks.map((t) => ({
             id: t.id,
@@ -137,6 +159,7 @@ export default async function ProjectPage({
             assigneeId: t.assigneeId,
             milestoneId: t.milestoneId,
             labels: t.labels,
+            parentTaskId: t.parentTaskId,
           }))}
           canWrite={canWrite}
           members={members}

@@ -74,11 +74,19 @@ export function QuickstartTour() {
           },
         },
         {
+          element: "[data-project-sidebar]",
+          popover: {
+            title: "项目入口集中在左侧",
+            description:
+              "概览、任务和迭代随时可打开；展开协作或成果与记录，可进入公告、资料、成果和周报。深色项表示当前位置。",
+          },
+        },
+        {
           element: '[data-tour="board"]',
           popover: {
-            title: "打开任务卡片",
+            title: "选择适合的任务视图",
             description:
-              "点击任务卡片进入详情，可修改、讨论或删除任务。主任务删除会同时删除其子任务。",
+              "看板推进状态，列表核对分工，甘特图查看排期。三种视图共用筛选和任务详情；展开常用筛选可保存到当前浏览器。",
           },
         },
         {

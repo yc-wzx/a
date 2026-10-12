@@ -1,0 +1,20 @@
+{
+  "origin": "http://localhost:3099",
+  "production": false,
+  "accessedViaProxy": false,
+  "checkedAt": "2026-10-12T12:34:57.748Z",
+  "checks": [
+    "Grouped sidebar highlights nested routes and keeps existing collaboration entries usable",
+    "Named view saves list and sort settings, survives reload and supports renaming",
+    "List and Gantt share one task detail panel; filter changes and resets preserve the selected view",
+    "Saved views are isolated between projects in the same browser",
+    "Existing timeline URL redirects to Gantt without dropping filters",
+    "Workload shows actual task counts, explains counting and links to member-filtered tasks",
+    "Project sidebar, list and workload fit 1440 and 1366 desktop viewports",
+    "Deleting a saved view removes preferences only",
+    "Non-members cannot see project navigation or workload",
+    "No browser runtime errors and no server task data changed"
+  ],
+  "runtimeErrors": [],
+  "result": "passed"
+}
