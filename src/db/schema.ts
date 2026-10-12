@@ -36,6 +36,19 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Personal model credentials stay outside public user/team DTOs.
+export const userAiSettings = pgTable("user_ai_settings", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  baseUrl: text("base_url").notNull(),
+  modelId: text("model_id").notNull(),
+  apiKeyCiphertext: text("api_key_ciphertext").notNull(),
+  assistantName: text("assistant_name").notNull().default("我的项目助手"),
+  instructions: text("instructions").notNull().default(""),
+  revision: integer("revision").notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const teams = pgTable("teams", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),

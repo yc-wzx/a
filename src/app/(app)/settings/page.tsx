@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { FeishuCard } from "./feishu-card";
 import { getMyNotificationChannels } from "@/lib/notification";
+import { getMyAiSettings } from "@/lib/agent/personal-settings";
+import { AiCard } from "./ai-card";
 
 function fmt(d: Date | null): string | null {
   if (!d) return null;
@@ -29,16 +31,18 @@ export default async function SettingsPage({
     .where(eq(users.id, session.user.id));
   const { feishu } = await searchParams;
   const channels = await getMyNotificationChannels(session.user.id);
+  const aiSettings=await getMyAiSettings(session.user.id);
 
   return (
     <main className="mx-auto max-w-2xl space-y-8 py-8">
       <header className="space-y-1">
         <h1 className="font-display text-2xl font-semibold text-ink">设置</h1>
         <p className="text-sm text-ink-soft">
-          账号与通知设置。个人访问令牌见「设置 → 令牌」。
+          个人 AI 助手、账号与通知设置。个人访问令牌见「设置 → 令牌」。
         </p>
       </header>
 
+      <AiCard initial={aiSettings}/>
       <FeishuCard
         boundName={row?.feishuName ?? null}
         boundAtLabel={fmt(row?.feishuBoundAt ?? null)}

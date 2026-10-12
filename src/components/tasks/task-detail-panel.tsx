@@ -199,7 +199,7 @@ export function TaskDetailPanel({
 
   async function handleDelete() {
     if (!local) return;
-    if (!confirm("确认删除该任务？此操作不可恢复。")) return;
+    if (!confirm("确认删除该任务及其所有子任务？此操作不可恢复。")) return;
     setDeleting(true);
     setSaveError(null);
     const res = await deleteTaskV1Action(projectId, taskId, {

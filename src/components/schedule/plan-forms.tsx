@@ -93,7 +93,11 @@ export function PersonalPlanGenerator({
       </div>
       {!aiAvailable && (
         <p className="text-sm text-ink-soft">
-          当前尚未配置 AI 服务，可先使用规则规划；不会把规则结果冒充 AI 生成。
+          尚未配置自己的 AI 助手，可先使用规则规划，或到{" "}
+          <Link href="/settings#my-ai" className="text-primary underline">
+            个人 AI 设置
+          </Link>{" "}
+          配置。
         </p>
       )}
       <label className="block text-sm">

@@ -17,6 +17,7 @@ import { ChatPanel } from "./chat-panel";
 import { FilterBar } from "./filter-bar";
 import { ProjectNav } from "@/components/projects/project-nav";
 import { ProjectLeadership } from "@/components/projects/project-leadership";
+import { getMyAiSettings } from "@/lib/agent/personal-settings";
 
 export default async function ProjectPage({
   params,
@@ -35,13 +36,14 @@ export default async function ProjectPage({
   if (!access) notFound();
   const { project, role } = access;
 
-  const [projectMilestones, projectTasks, members, dependencies, teamLabels] =
+  const [projectMilestones, projectTasks, members, dependencies, teamLabels, myAi] =
     await Promise.all([
       listProjectMilestones(session.user.id, projectId),
       listProjectTasks(session.user.id, projectId),
       listTeamMembers(project.teamId),
       listProjectDependencies(session.user.id, projectId),
       listTeamLabels(session.user.id, project.teamId),
+      getMyAiSettings(session.user.id),
     ]);
 
   const filters = parseFilters(
@@ -65,7 +67,7 @@ export default async function ProjectPage({
   const latestConv = await getOrCreateScopedConversation(
     session.user.id,
     projectId,
-    { scope: "project" },
+    { scope: "personal" },
   );
   const history = (
     await listBoundedConversationMessages(session.user.id, latestConv.id)
@@ -103,11 +105,12 @@ export default async function ProjectPage({
       <MilestoneSection
         projectId={projectId}
         milestones={projectMilestones}
-        isAdmin={isAdmin}
+        isAdmin={isAdmin && project.status !== "archived"}
       />
 
-      <section className="space-y-3">
+      <section className="space-y-3" data-tour="board">
         <h2 className="font-medium text-ink">看板</h2>
+        <p className="text-xs text-ink-soft">点击任务卡片打开详情，可查看、修改或删除任务。删除主任务会同时删除其子任务；老师角色只读。</p>
         <FilterBar
           members={members.map((m) => ({ id: m.id, name: m.name }))}
           milestones={projectMilestones.map((m) => ({
@@ -147,7 +150,10 @@ export default async function ProjectPage({
       </section>
 
       <ChatPanel
+        assistantName={myAi.assistantName}
         projectId={projectId}
+        scope="personal"
+        conversationId={latestConv.id}
         initialMessages={initialMessages}
         members={members}
         milestones={projectMilestones.map((m) => ({ id: m.id, name: m.title }))}

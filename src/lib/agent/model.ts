@@ -1,19 +1,38 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModel } from "ai";
 import { AppError } from "@/lib/errors";
+import { readMyAiCredential } from "./personal-settings";
 
-// DeepSeek 已废弃 deepseek-chat 番号（现返 400 invalid_request_error），现行为 v4 系列。
-// flash 迅捷省耗，适配项目管理助手的短问答+工具调用；重推理可经 DEEPSEEK_MODEL 换 deepseek-v4-pro。
-const DEFAULT_MODEL = "deepseek-v4-flash";
-
-// 仅在生产（route 未注入 model）时调用；测试注入 MockLanguageModelV2，不触达此函数
-export function getModel(): LanguageModel {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new AppError("DeepSeek 未配置：请在 .env 设置 DEEPSEEK_API_KEY");
-  const deepseek = createOpenAICompatible({
-    name: "deepseek",
-    baseURL: process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com",
-    headers: { Authorization: `Bearer ${apiKey}` },
+// Every invocation resolves the authenticated actor's own configuration.
+// Never fall back to another user's key or a shared DEEPSEEK_API_KEY.
+export async function getConfiguredAssistant(actorId: string) {
+  const settings = await readMyAiCredential(actorId);
+  const provider = createOpenAICompatible({
+    name: settings.provider,
+    baseURL: settings.baseUrl,
+    apiKey: settings.apiKey,
+    fetch: (input, init) => fetch(input, { ...init, redirect: "error" }),
   });
-  return deepseek(process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL);
+  return {
+    model: provider(settings.modelId) as LanguageModel,
+    name: settings.assistantName,
+    instructions: settings.instructions,
+  };
+}
+
+export async function getModel(actorId: string): Promise<LanguageModel> {
+  return (await getConfiguredAssistant(actorId)).model;
+}
+
+export async function personalModelRequest<T>(
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await run();
+  } catch {
+    // Provider exceptions may contain request bodies and credentials. Do not log or return them.
+    throw new AppError(
+      "个人 AI 服务调用失败，请到设置测试连接并核对模型、密钥和额度；本次没有完成操作",
+    );
+  }
 }
