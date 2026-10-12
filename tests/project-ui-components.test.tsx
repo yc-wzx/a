@@ -4,6 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { SetupStep } from "@/lib/project-setup-steps";
 import { SetupGuide } from "@/components/projects/setup-guide";
 import { ProjectNav } from "@/components/projects/project-nav";
+import { ProjectSidebar } from "@/components/projects/project-sidebar";
+let pathname = "/";
+vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 
 // next/link 需要 App Router 上下文；这里只做静态渲染，替换成普通 <a>（保留其余 props）。
 vi.mock("next/link", () => ({
@@ -45,7 +48,11 @@ describe("SetupGuide", () => {
   it("只给有真实入口的未完成步骤配「去完成」，没有入口的步骤不放假链接", () => {
     const html = renderToStaticMarkup(
       <SetupGuide
-        steps={[GOAL_STEP, MILESTONE_STEP, { ...MILESTONE_STEP, key: "members", done: true }]}
+        steps={[
+          GOAL_STEP,
+          MILESTONE_STEP,
+          { ...MILESTONE_STEP, key: "members", done: true },
+        ]}
       />,
     );
     expect(html).toContain("项目起步引导");
@@ -56,7 +63,9 @@ describe("SetupGuide", () => {
   });
 
   it("只有一个按钮（暂时跳过），不提供“标记完成”开关", () => {
-    const html = renderToStaticMarkup(<SetupGuide steps={[GOAL_STEP, MILESTONE_STEP]} />);
+    const html = renderToStaticMarkup(
+      <SetupGuide steps={[GOAL_STEP, MILESTONE_STEP]} />,
+    );
     expect((html.match(/<button/g) ?? []).length).toBe(1);
     expect(html).toContain("没有“标记完成”开关");
     expect(html).toContain("还剩");
@@ -64,9 +73,10 @@ describe("SetupGuide", () => {
 });
 
 describe("ProjectNav", () => {
-  it("迭代入口已打开，五个入口齐备", () => {
+  it("侧栏提供现有项目入口，页面内只显示当前位置", () => {
+    pathname = `/projects/${PROJECT_ID}/overview`;
     const html = renderToStaticMarkup(
-      <ProjectNav projectId={PROJECT_ID} current="overview" />,
+      <ProjectSidebar projectId={PROJECT_ID} name="示例项目" />,
     );
     for (const label of ["概览", "任务", "迭代", "成果", "时间线"]) {
       expect(html).toContain(label);
@@ -76,11 +86,18 @@ describe("ProjectNav", () => {
     expect(html).toContain(`/projects/${PROJECT_ID}/timeline`);
     // 任务入口就是项目根路径
     expect(html).toContain(`href="/projects/${PROJECT_ID}"`);
+    const breadcrumb = renderToStaticMarkup(
+      <ProjectNav projectId={PROJECT_ID} current="tasks" />,
+    );
+    expect(breadcrumb).toContain("项目当前位置");
+    expect(breadcrumb).toContain("任务");
+    expect(breadcrumb).not.toContain("迭代");
   });
 
   it("当前页面只标记一次 aria-current", () => {
+    pathname = `/projects/${PROJECT_ID}/deliverables/example`;
     const html = renderToStaticMarkup(
-      <ProjectNav projectId={PROJECT_ID} current="deliverables" />,
+      <ProjectSidebar projectId={PROJECT_ID} name="示例项目" />,
     );
     expect((html.match(/aria-current="page"/g) ?? []).length).toBe(1);
   });

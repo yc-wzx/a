@@ -3,10 +3,10 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   parseFilters,
-  serializeFilters,
   type BoardFilters,
   type GroupBy,
 } from "@/lib/board-filters";
+import { replaceProjectFilters } from "@/lib/project-views";
 
 type Option = { id: string; name: string };
 
@@ -43,11 +43,17 @@ export function FilterBar({
 
   // 筛选态写入 URL：可分享、可刷新保持、可后退。scroll:false 免得跳回页首。
   function push(next: BoardFilters) {
-    const qs = serializeFilters(next);
+    const qs = replaceProjectFilters(
+      new URLSearchParams(searchParams.toString()),
+      next,
+    ).toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
-  function toggle(key: "assignee" | "priority" | "label" | "milestone", id: string) {
+  function toggle(
+    key: "assignee" | "priority" | "label" | "milestone",
+    id: string,
+  ) {
     const cur = filters[key];
     const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
     push({ ...filters, [key]: next });
@@ -115,7 +121,10 @@ export function FilterBar({
           </Group>
         )}
 
-        <Chip on={filters.overdue} onClick={() => push({ ...filters, overdue: !filters.overdue })}>
+        <Chip
+          on={filters.overdue}
+          onClick={() => push({ ...filters, overdue: !filters.overdue })}
+        >
           仅看逾期
         </Chip>
       </div>
@@ -124,7 +133,9 @@ export function FilterBar({
         <span className="text-xs font-medium text-ink-soft">分组依据</span>
         <select
           value={filters.group}
-          onChange={(e) => push({ ...filters, group: e.target.value as GroupBy })}
+          onChange={(e) =>
+            push({ ...filters, group: e.target.value as GroupBy })
+          }
           className="ac-field w-auto py-1 text-sm"
         >
           {(Object.keys(GROUP_LABEL) as GroupBy[]).map((g) => (
@@ -159,7 +170,13 @@ export function FilterBar({
   );
 }
 
-function Group({ name, children }: { name: string; children: React.ReactNode }) {
+function Group({
+  name,
+  children,
+}: {
+  name: string;
+  children: React.ReactNode;
+}) {
   return (
     <span className="flex flex-wrap items-center gap-1">
       <span className="text-xs font-medium text-ink-soft">{name}</span>
@@ -183,7 +200,9 @@ function Chip({
       aria-pressed={on}
       onClick={onClick}
       className={`ac-badge transition ${
-        on ? "bg-primary text-white" : "bg-surface text-ink-soft hover:bg-primary-soft"
+        on
+          ? "bg-primary text-white"
+          : "bg-surface text-ink-soft hover:bg-primary-soft"
       }`}
     >
       {children}
