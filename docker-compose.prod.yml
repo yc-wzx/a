@@ -81,6 +81,7 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:-localhost}
+      DIRECT_DOMAIN: ${DIRECT_DOMAIN:-}
       PUBLIC_IP: ${PUBLIC_IP:-}
       ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
     ports: ["80:80", "443:443"]

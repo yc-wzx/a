@@ -1,0 +1,8 @@
+# Replace both placeholders. Credentials are supplied by systemd LoadCredential.
+tunnel: YOUR_TUNNEL_UUID
+ingress:
+  - hostname: YOUR_DOMAIN
+    service: http://127.0.0.1:3080
+    originRequest:
+      httpHostHeader: YOUR_DOMAIN
+  - service: http_status:404
