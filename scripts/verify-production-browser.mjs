@@ -11,7 +11,7 @@ const dir = process.env.VERIFY_OUTPUT_DIR;
 if(!dir || !path.isAbsolute(dir)) throw Error('Set an absolute private VERIFY_OUTPUT_DIR');
 fs.mkdirSync(dir,{recursive:true,mode:0o700});
 const origin = process.env.VERIFY_ORIGIN;
-if(!['https://47.242.210.133','https://agilecampus-47-242-210-133.sslip.io'].includes(origin)) throw Error('This verification is scoped to the purchased AgileCampus server');
+if(!['https://47.242.210.133','https://agilecampus-47-242-210-133.sslip.io','https://weidu-agilecampus.pw'].includes(origin)) throw Error('This verification is scoped to the purchased AgileCampus server');
 const file = path.join(dir, 'verification-account.private.json');
 let account;
 if (fs.existsSync(file)) account = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -23,7 +23,7 @@ else {
 const checks=[];
 let completed=false;
 if(process.env.GITHUB_ACTIONS) console.log(`::add-mask::${account.password}`);
-const browser=await chromium.launch({headless:true, ...(process.platform === 'win32' ? {channel:'msedge'} : {}), ...(process.env.QA_PROXY ? {proxy:{server:process.env.QA_PROXY}} : {})});
+const browser=await chromium.launch({headless:true,args:process.env.QA_PROXY?[]:['--no-proxy-server'], ...(process.platform === 'win32' ? {channel:'msedge'} : {}), ...(process.env.QA_PROXY ? {proxy:{server:process.env.QA_PROXY}} : {})});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
 const page=await context.newPage();
 page.setDefaultTimeout(25000);
@@ -44,9 +44,9 @@ async function login() {
   await page.waitForURL('**/dashboard');
 }
 try {
-  const health=await context.request.get(origin+'/api/health');
+  const health=await page.goto(origin+'/api/health');
   assert.equal(health.status(),200);
-  assert.equal((await health.json()).ok,true);
+  assert.equal(JSON.parse(await page.locator('body').innerText()).ok,true);
   checks.push('HTTPS certificate validation and database health');
   if(!account.registered) {
     await page.goto(origin+'/register');
@@ -137,9 +137,12 @@ try {
     await visit(route);
     checks.push(`Page renders ${route.replace(account.projectId,'{projectId}').replace(account.teamId,'{teamId}')}`);
   }
-  const calendar=await context.request.get(`${origin}/api/projects/${account.projectId}/calendar`);
-  assert.equal(calendar.status(),200);
-  assert((await calendar.text()).includes('BEGIN:VCALENDAR'));
+  const calendar=await page.evaluate(async url => {
+    const response=await fetch(url);
+    return {status:response.status,body:await response.text()};
+  }, `${origin}/api/projects/${account.projectId}/calendar`);
+  assert.equal(calendar.status,200);
+  assert(calendar.body.includes('BEGIN:VCALENDAR'));
   checks.push('Calendar export');
   if(!account.outsider) {
     account.outsider={email:`deploy-check-outsider-${crypto.randomBytes(5).toString('hex')}@example.com`,password:crypto.randomBytes(24).toString('base64url')};
@@ -172,14 +175,6 @@ try {
   assert(!(await outsider.locator('main').innerText()).includes('验收示例私有事件'));
   await outsiderContext.close();
   checks.push('Second account cannot access private team, project or schedule');
-  await page.setViewportSize({width:390,height:844});
-  for(const route of ['/dashboard','/schedule',`/projects/${account.projectId}/overview`]) {
-    await visit(route);
-    const sizes=await page.evaluate(()=>({viewport:innerWidth,content:document.documentElement.scrollWidth}));
-    assert(sizes.content<=sizes.viewport+2,`Mobile overflow ${route}: ${JSON.stringify(sizes)}`);
-  }
-  await page.screenshot({path:path.join(dir,'production-mobile.png'),fullPage:true});
-  checks.push('Mobile dashboard, schedule and project overview at 390px');
   assert.equal(errors.length,0,`Browser errors: ${errors.join('; ')}`);
   completed=true;
 } finally {

@@ -1,0 +1,171 @@
+{
+  "origin": "https://weidu-agilecampus.pw",
+  "applicationImage": "agilecampus:release-8424e13465c9",
+  "date": "2026-10-12",
+  "scope": "Desktop website only; private synthetic verification data, not team weekly progress",
+  "userConfirmedAccess": {
+    "network": "Campus network",
+    "device": "Desktop browser",
+    "proxy": false,
+    "result": "Login page visible",
+    "source": "User reply on 2026-10-12"
+  },
+  "globalping": {
+    "id": "2bQrmjyZM4incrA7100021Ij9",
+    "createdAt": "2026-10-12T04:31:48.289Z",
+    "status": "finished",
+    "results": [
+      {
+        "country": "CN",
+        "city": "Dongguan",
+        "asn": 4134,
+        "address": "172.67.178.51",
+        "statusCode": 200,
+        "tlsAuthorized": true,
+        "totalMs": 6326
+      },
+      {
+        "country": "CN",
+        "city": "Nanjing",
+        "asn": 4134,
+        "address": "104.21.17.193",
+        "statusCode": 200,
+        "tlsAuthorized": true,
+        "totalMs": 1549
+      },
+      {
+        "country": "CN",
+        "city": "Nanning",
+        "asn": 4837,
+        "address": "172.67.178.51",
+        "statusCode": 200,
+        "tlsAuthorized": true,
+        "totalMs": 8203
+      },
+      {
+        "country": "CN",
+        "city": "Changsha",
+        "asn": 4837,
+        "address": "172.67.178.51",
+        "statusCode": 200,
+        "tlsAuthorized": true,
+        "totalMs": 1731
+      },
+      {
+        "country": "CN",
+        "city": "Beijing",
+        "asn": 9808,
+        "address": "172.67.178.51",
+        "statusCode": 200,
+        "tlsAuthorized": true,
+        "totalMs": 506
+      },
+      {
+        "country": "CN",
+        "city": "Wuhan",
+        "asn": 9808,
+        "address": "104.21.17.193",
+        "statusCode": 200,
+        "tlsAuthorized": true,
+        "totalMs": 1321
+      },
+      {
+        "country": "HK",
+        "city": "Hong Kong",
+        "asn": 133752,
+        "address": "172.67.178.51",
+        "statusCode": 200,
+        "tlsAuthorized": true,
+        "totalMs": 92
+      },
+      {
+        "country": "US",
+        "city": "Buffalo",
+        "asn": 36352,
+        "address": "104.21.17.193",
+        "statusCode": 200,
+        "tlsAuthorized": true,
+        "totalMs": 737
+      }
+    ]
+  },
+  "desktopBrowser": {
+    "origin": "https://weidu-agilecampus.pw",
+    "completed": true,
+    "verifiedAt": "2026-10-12T05:23:07.871Z",
+    "networkMode": "configured-proxy",
+    "runtimePlatform": "win32",
+    "checks": [
+      "HTTPS certificate validation and database health",
+      "Register new private synthetic account",
+      "Login and authenticated session",
+      "Create private team",
+      "Create course project with template",
+      "Create assigned task",
+      "Task persists after reload",
+      "Save private emergency event, default sharing disabled",
+      "Private emergency event absent from team availability",
+      "Generate and confirm schedule-aware rule plan",
+      "Page renders /dashboard",
+      "Page renders /projects",
+      "Page renders /notifications",
+      "Page renders /settings",
+      "Page renders /settings/tokens",
+      "Page renders /teacher",
+      "Page renders /schedule",
+      "Page renders /teams/{teamId}/availability",
+      "Page renders /projects/{projectId}/overview",
+      "Page renders /projects/{projectId}/iterations",
+      "Page renders /projects/{projectId}/deliverables",
+      "Page renders /projects/{projectId}/references",
+      "Page renders /projects/{projectId}/announcements",
+      "Page renders /projects/{projectId}/reports",
+      "Page renders /projects/{projectId}/evidence/process",
+      "Page renders /projects/{projectId}/ai-drafts",
+      "Page renders /projects/{projectId}/timeline",
+      "Page renders /projects/{projectId}/personal-plan",
+      "Calendar export",
+      "Second account cannot access private team, project or schedule"
+    ],
+    "browserErrors": []
+  },
+  "directAutomation": {
+    "origin": "https://weidu-agilecampus.pw",
+    "completed": false,
+    "verifiedAt": "2026-10-12T05:22:00.692Z",
+    "networkMode": "direct",
+    "runtimePlatform": "win32",
+    "checks": [],
+    "browserErrors": [],
+    "edgeError": "page.goto /api/health timed out after 30000ms",
+    "nodeHttpError": "ECONNRESET",
+    "countedAsPassed": false
+  },
+  "serverVerification": {
+    "verifiedAt": "2026-10-12T05:28:51.148Z",
+    "databaseContainerUnchanged": true,
+    "applicationImageUnchanged": true,
+    "secretsUnchanged": true,
+    "servicesHealthy": true,
+    "composePreflightPassed": true,
+    "smokePassed": true,
+    "namedTunnelActive": true,
+    "bootEnabled": true,
+    "serviceRestartVerified": true,
+    "serverRebootTested": false,
+    "readyConnections": 4,
+    "oldHostnameRedirectStatus": 302,
+    "oldHostnameRedirectTarget": "https://weidu-agilecampus.pw/login",
+    "quickTunnelStopped": true,
+    "previewContainerRemoved": true,
+    "accountCertificateRemoved": true,
+    "scopedRunCredentialRetained": true
+  },
+  "limitations": [
+    "Some domestic nodes took several seconds; no guarantee of universal availability.",
+    "Original Hong Kong IP connectivity was not repaired.",
+    "Full teammate trial remains pending.",
+    "Real AI and Feishu are not configured or verified.",
+    "Certificate auto-renewal has not yet elapsed."
+  ]
+}

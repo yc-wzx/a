@@ -1,0 +1,23 @@
+[Unit]
+Description=AgileCampus permanent Cloudflare Tunnel
+Wants=network-online.target
+After=network-online.target docker.service
+ConditionPathExists=/etc/agilecampus-cloudflared/tunnel.json
+
+[Service]
+Type=simple
+DynamicUser=yes
+LoadCredential=tunnel-credentials:/etc/agilecampus-cloudflared/tunnel.json
+ExecStart=/opt/agilecampus-cloudflared/cloudflared tunnel --config /opt/agilecampus-cloudflared/config.yml --no-autoupdate --protocol http2 --edge-ip-version 4 --metrics 127.0.0.1:3085 run --credentials-file ${CREDENTIALS_DIRECTORY}/tunnel-credentials
+Restart=on-failure
+RestartSec=5s
+Environment=GOMAXPROCS=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+MemoryMax=192M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

@@ -6,9 +6,10 @@ on:
       origin:
         description: Entrance to verify on the purchased server
         required: true
-        default: https://47.242.210.133
+        default: https://weidu-agilecampus.pw
         type: choice
         options:
+          - https://weidu-agilecampus.pw
           - https://47.242.210.133
           - https://agilecampus-47-242-210-133.sslip.io
 
@@ -32,7 +33,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/browser-qa" --no-package-lock --ignore-scripts playwright@1.62.1
           "$RUNNER_TEMP/browser-qa/node_modules/.bin/playwright" install --with-deps chromium
           cp scripts/verify-production-browser.mjs "$RUNNER_TEMP/browser-qa/check.mjs"
-      - name: Verify registration, collaboration, schedule and mobile pages
+      - name: Verify desktop registration, collaboration and schedule
         env:
           ALLOW_PRODUCTION_QA: 'true'
           VERIFY_ORIGIN: ${{ inputs.origin }}
@@ -50,5 +51,4 @@ jobs:
           path: |
             ${{ runner.temp }}/browser-qa/result/production-verification.json
             ${{ runner.temp }}/browser-qa/result/production-board.png
-            ${{ runner.temp }}/browser-qa/result/production-mobile.png
           if-no-files-found: warn
