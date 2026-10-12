@@ -1,0 +1,18 @@
+{
+  "origin": "https://weidu-agilecampus.pw",
+  "desktopOnly": true,
+  "exampleData": true,
+  "checks": [
+    "Desktop workspace renders four real summary cards and two columns",
+    "1440 and 1366 desktop layouts fit without horizontal scrolling",
+    "Task search has an explanatory empty state and reversible reset",
+    "Open-source command menu supports Ctrl K, Chinese search and keyboard navigation",
+    "Escape closes command menu and restores trigger focus",
+    "Refresh exposes completion feedback",
+    "No uncaught browser errors"
+  ],
+  "errors": [],
+  "networkMode": "configured-proxy",
+  "runtimePlatform": "win32",
+  "verifiedAt": "2026-10-12T11:34:12.147Z"
+}

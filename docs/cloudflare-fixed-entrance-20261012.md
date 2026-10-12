@@ -6,7 +6,7 @@
 
 域名已在 Cloudflare Free 激活，阿里云域名的名称服务器为 `meg.ns.cloudflare.com`、`rob.ns.cloudflare.com`。网站使用名为 `weidu-agilecampus` 的正式 Cloudflare Tunnel。访问经过 Cloudflare HTTPS → 香港服务器的出站隧道 → `127.0.0.1:3080` → 现有应用。数据库仍位于服务器 Docker 内网。
 
-上午的这次入口配置只更新访问入口及运行配置。当时应用为 `agilecampus:release-8424e13465c9`，数据库容器未更换，数据库密码、登录密钥和提醒密钥保持原值，没有执行迁移或清库。`AUTH_URL` 与 `AGILECAMPUS_URL` 均为新域名，登录回调不再跳回旧入口。下午已另行发布教程、删除和个人 AI 功能，当前版本见 [新功能上线验收](quickstart-live-20261012.md)；下方访问证据保留原测试时间。
+上午的这次入口配置只更新访问入口及运行配置。当时应用为 `agilecampus:release-8424e13465c9`，数据库容器未更换，数据库密码、登录密钥和提醒密钥保持原值，没有执行迁移或清库。`AUTH_URL` 与 `AGILECAMPUS_URL` 均为新域名，登录回调不再跳回旧入口。下午已另行发布教程、删除和个人 AI 功能；19:33 再发布工作台改进，当前版本见 [工作台上线验收](workspace-live-20261012.md)。下方访问证据保留原测试时间。
 
 | 项目 | 实际配置 |
 |---|---|
