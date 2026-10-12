@@ -26,6 +26,30 @@ export function QuickstartTour() {
           },
         },
         {
+          element: '[data-tour="workspace-summary"]',
+          popover: {
+            title: "先看今天需要关注什么",
+            description:
+              "逾期、今天截止、待修改成果和未读通知分别呈现。点击卡片可进入对应区域。",
+          },
+        },
+        {
+          element: '[data-tour="workspace-tasks"]',
+          popover: {
+            title: "缩小任务范围",
+            description:
+              "按截止时间、项目或关键词筛选自己的任务；点击任务进入详情。Ctrl K 可以快速查找入口。",
+          },
+        },
+        {
+          element: '[data-tour="workspace-schedule"]',
+          popover: {
+            title: "结合自己的日程",
+            description:
+              "这里只显示你本人的日程。临时事件使安排过期时，会提示重新核对个人规划。",
+          },
+        },
+        {
           element: '[data-tour="teams"]',
           popover: {
             title: "先加入团队",

@@ -111,7 +111,7 @@ export default async function AppLayout({
           </div>
         </details>
       </header>
-      <div className="mx-auto max-w-5xl p-6">
+      <div className="mx-auto max-w-6xl p-6">
         <GettingStartedHint userId={session.user.id} />
         {children}
       </div>

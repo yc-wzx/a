@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockLanguageModelV2 } from "ai/test";
 import { db } from "@/db";
 import {
@@ -32,6 +32,12 @@ import {
 } from "@/lib/schedule/types";
 import { resetDb } from "./helpers";
 const now = new Date("2026-10-12T00:00:00Z");
+// 生成与确认用同一测试时刻，避免晚上执行时把样例的 18:00 安排判为过去。
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
+});
+afterEach(() => vi.useRealTimers());
 async function scene() {
   const [admin, student, other, outsider] = await db
     .insert(users)
