@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createTeam, joinTeam } from "@/lib/team";
@@ -18,6 +18,7 @@ import { markNotificationReadAction, markAllNotificationsReadAction } from "@/ap
 
 describe("F route and Action contracts", () => {
   beforeEach(async () => { vi.resetAllMocks(); await resetDb(); });
+  afterEach(() => vi.unstubAllEnvs());
   it("每个入口拒绝未登录；未读数错误不会伪装成零", async () => {
     mocks.auth.mockResolvedValue(null);
     const id = randomUUID();
@@ -54,5 +55,32 @@ describe("F route and Action contracts", () => {
       const response = await readAll(new Request("http://test/api/notifications/read-all", { method: "POST", body }));
       expect(response.status).toBe(400); expect(await response.json()).toMatchObject({ code: "VALIDATION" });
     }
+  });
+  it("反向代理使用配置的公网来源；伪造来源或转发头不能标记真实通知", async () => {
+    vi.stubEnv("AUTH_URL", "https://weidu.example.test");
+    const [owner, member] = await db.insert(users).values(["owner", "member"].map(name => ({ name, email: `${name}@proxy-notify.test`, passwordHash: "fixture" }))).returning();
+    const team = await createTeam(owner.id, "代理通知"); await joinTeam(member.id, team.inviteCode);
+    const project = await createProject(owner.id, team.id, { name: "公网通知" });
+    await createTask(owner.id, project.id, { title: "单条通知", assigneeId: member.id });
+    mocks.auth.mockResolvedValue({ user: { id: member.id } });
+    const item = (await listMyNotifications(member.id)).items[0];
+    for (const [url, headers] of [
+      ["http://localhost:3000", { origin: "https://attacker.test", "x-forwarded-host": "attacker.test" }],
+      ["https://attacker.test", { origin: "https://attacker.test" }],
+      ["http://localhost:3000", { origin: "https://weidu.example.test", "sec-fetch-site": "cross-site" }],
+    ] as const) expect((await read(new Request(`${url}/api/notifications/${item.id}/read`, { method: "POST", headers }), { params: Promise.resolve({ id: item.id }) })).status).toBe(403);
+    expect((await count()).status).toBe(200);
+    expect((await listMyNotifications(member.id)).items[0].readAt).toBeNull();
+    const valid = await read(new Request(`http://localhost:3000/api/notifications/${item.id}/read`, { method: "POST", headers: { origin: "https://weidu.example.test", "sec-fetch-site": "same-origin" } }), { params: Promise.resolve({ id: item.id }) });
+    expect(valid.status).toBe(200); expect(await valid.json()).toMatchObject({ id: item.id, readAt: expect.any(String) });
+    await createTask(owner.id, project.id, { title: "批量通知", assigneeId: member.id });
+    const response = await readAll(new Request("http://localhost:3000/api/notifications/read-all", { method: "POST", headers: { origin: "https://weidu.example.test" }, body: JSON.stringify({ requestId: randomUUID(), beforeCreatedAt: new Date().toISOString(), projectId: project.id }) }));
+    expect(response.status).toBe(200); expect(await response.json()).toMatchObject({ markedCount: 1 });
+    expect((await listMyNotifications(member.id)).items.every(n => n.readAt !== null)).toBe(true);
+  });
+  it("公网网址配置无效时拒绝写入，不回退相信请求头", async () => {
+    vi.stubEnv("AUTH_URL", "not-a-public-url");
+    const response = await readAll(new Request("http://test/api/notifications/read-all", { method: "POST", headers: { origin: "http://test" } }));
+    expect(response.status).toBe(403); expect(mocks.auth).not.toHaveBeenCalled();
   });
 });
