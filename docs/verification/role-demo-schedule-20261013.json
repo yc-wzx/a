@@ -1,0 +1,19 @@
+{
+  "importPreview": "passed",
+  "eventEditDelete": "passed",
+  "manualSchedule": "passed",
+  "ruleDraft": "passed",
+  "avoidCourses": "passed",
+  "confirmation": "passed",
+  "cancel": "passed",
+  "sharedTasksUnchanged": "passed",
+  "privateData": "passed",
+  "otherTeamDenied": "passed",
+  "emergencySupplement": "passed",
+  "fuzzyBusyOnly": "passed",
+  "teacherView": "passed",
+  "sharingRevocation": "passed",
+  "atomicReplanning": "passed",
+  "mobile": [],
+  "pageErrors": []
+}

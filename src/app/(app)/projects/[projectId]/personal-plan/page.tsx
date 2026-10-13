@@ -103,6 +103,7 @@ export default async function Page({
       </section>
       {access.role !== "teacher" && access.project.status !== "archived" ? (
         <PersonalPlanGenerator
+          key={`${projectId}:${seed?.id ?? "new-plan"}`}
           projectId={projectId}
           startDate={startDate}
           candidates={workspace.candidates}
