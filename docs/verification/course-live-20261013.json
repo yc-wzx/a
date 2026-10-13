@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-13",
+  "origin": "https://weidu-agilecampus.pw",
+  "releaseRevision": "90d4efa687ecc08b15d19bcc1c87bd31a09195d4",
+  "deployment": {
+    "databaseContainerRetained": true,
+    "loginAndPersonalAiEncryptionSettingsRetained": true,
+    "ownedQaFixturesRemoved": true,
+    "cleanDatabaseBackupCompleted": true,
+    "finalCounts": { "users": 16, "projects": 9, "tasks": 8, "migrations": 18 }
+  },
+  "pullRequests": [
+    "https://github.com/yc-wzx/agilecampus/pull/32",
+    "https://github.com/yc-wzx/agilecampus/pull/33",
+    "https://github.com/yc-wzx/agilecampus/pull/34",
+    "https://github.com/yc-wzx/agilecampus/pull/35"
+  ],
+  "linuxBuild": "https://github.com/yc-wzx/agilecampus/actions/runs/38329646082",
+  "previousFullRegression": {
+    "passed": 727,
+    "skipped": 2
+  },
+  "interfaceBusinessTestsPassed": 58,
+  "notificationProxyTestsPassed": 16,
+  "liveBrowser": {
+    "independentAccounts": 3,
+    "documentRevision": "8a163d62c3213571db4335e11825c843e27ac270",
+    "interfaceRevision": "90d4efa687ecc08b15d19bcc1c87bd31a09195d4",
+    "checks": [
+      "新建文档、真实正文保存与稳定段落标识",
+      "两个独立账号同时编辑、正文收敛与在线成员显示",
+      "断线输入保留，恢复网络后自动合并保存",
+      "教师默认不能改正文，可以定位段落提出反馈",
+      "教师段落反馈可以由成员回复，评论与回复分别留存",
+      "命名版本、可读差异、恢复正文与旧会话停止同步",
+      "任务详情检查清单与关注可用，任务和文档双向跳转",
+      "进行中主任务数量软提醒",
+      "个人草稿撤回分享后正文、搜索标题及数量均不可见",
+      "回收站删除与恢复保留正文及关联",
+      "Markdown导入表格与检查项、编辑器显示及导出",
+      "项目目录真实计数、状态与关键词筛选、排序和清除筛选",
+      "项目卡片直接进入当前项目文档",
+      "团队成员项目计数、角色筛选、邀请码复制与加入错误反馈",
+      "通知按项目筛选、来源链接及项目范围批量已读不影响其他项目",
+      "通知未读过滤、单条已读和空状态",
+      "页面指引统一纳入教程菜单、指引可退出、正式教程角色与目录可访问",
+      "1366与1440桌面宽度无横向页面溢出",
+      "三个桌面浏览器会话无未捕获页面异常"
+    ],
+    "uncaughtErrors": []
+  },
+  "aiProviderCalls": "No paid or real provider call performed in this verification",
+  "desktopWidths": [
+    1366,
+    1440
+  ]
+}
