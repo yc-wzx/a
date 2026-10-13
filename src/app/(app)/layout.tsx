@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/lib/auth";
 import { NotificationNav } from "@/components/notification-nav";
+import { getMyProfile } from "@/lib/member-profile";
+import { MemberAvatar } from "@/components/people/member-avatar";
 import {
   GettingStartedHint,
   TutorialMenu,
@@ -14,6 +16,7 @@ export default async function AppLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  const me = await getMyProfile(session.user.id);
 
   return (
     <div className="min-h-screen">
@@ -60,14 +63,13 @@ export default async function AppLayout({
             aria-label="账户菜单"
             className="flex cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-field px-2 py-1.5 text-sm text-ink-soft transition-colors hover:bg-primary-soft hover:text-primary [&::-webkit-details-marker]:hidden"
           >
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-xs font-semibold text-white">
-              {session.user.name?.slice(0, 1) ?? "?"}
-            </span>
+            <MemberAvatar name={me.name} label={me.avatarLabel} color={me.avatarColor} compact />
             <span className="hidden max-w-40 truncate sm:inline">
-              {session.user.name}
+              {me.name}
             </span>
           </summary>
           <div className="absolute right-0 z-30 mt-1 w-40 space-y-1 rounded-field border border-line bg-surface p-1 shadow-pop">
+            <Link href={`/people/${session.user.id}`} className="block rounded px-3 py-2 text-sm text-ink-soft hover:bg-primary-soft">我的主页</Link>
             <Link
               href="/help"
               className="block rounded px-3 py-2 text-sm text-ink-soft hover:bg-primary-soft"

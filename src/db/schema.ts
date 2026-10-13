@@ -36,6 +36,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Member pages select these fields explicitly; private account settings remain separate.
+export const userProfiles = pgTable("user_profiles", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  bio: text("bio").notNull().default(""),
+  skills: jsonb("skills").$type<string[]>().notNull().default([]),
+  avatarColor: text("avatar_color").notNull().default("blue"),
+  avatarLabel: text("avatar_label").notNull().default(""),
+  revision: integer("revision").notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Personal model credentials stay outside public user/team DTOs.
 export const userAiSettings = pgTable("user_ai_settings", {
   userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),

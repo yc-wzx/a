@@ -26,11 +26,12 @@ import { saveScheduleSharing, getTeamAvailability } from "@/lib/schedule/availab
 import { generatePersonalPlan, changePersonalPlan } from "@/lib/schedule/planner";
 import { addDays, localInstant, shanghaiDay } from "@/lib/schedule/types";
 import { listMyNotifications, markNotificationRead } from "@/lib/notifications";
+import { updateMyProfile } from "@/lib/member-profile";
 
 const credentials = z.strictObject({ origin: z.url(), accounts: z.array(z.strictObject({
   role: z.enum(["admin", "student", "teacher"]),
   email: z.email().regex(/^(admin|student|teacher)\.demo@weidu-agilecampus\.pw$/),
-  name: z.string().min(1), password: z.string().min(16).max(72),
+  name: z.string().min(1), password: z.string().min(8).max(72),
 })).length(3) });
 let phase = "validate", teamId: string | undefined;
 const createdUsers: { id: string; email: string }[] = [];
@@ -50,6 +51,13 @@ async function main() {
   const accounts = [];
   for (const a of config.accounts) { const u = await createUser(a); createdUsers.push(u); accounts.push({ ...u, role: a.role }); }
   const admin = accounts.find(a => a.role === "admin")!, student = accounts.find(a => a.role === "student")!, teacher = accounts.find(a => a.role === "teacher")!;
+  for (const actor of accounts) await updateMyProfile(actor.id, {
+    name: actor.name, expectedRevision: 0,
+    bio: actor.role === "admin" ? "课堂模拟管理员：组织项目分工，跟进任务、迭代与部署维护。" : actor.role === "teacher" ? "课堂模拟指导教师：查看项目过程，评论文档并审阅阶段成果。" : "课堂模拟学生：负责交互设计与功能试用，记录任务过程并提交成果。",
+    skills: actor.role === "admin" ? ["项目组织", "任务分解", "部署维护"] : actor.role === "teacher" ? ["课程指导", "成果审阅", "反馈"] : ["交互设计", "前端开发", "测试"],
+    avatarColor: actor.role === "admin" ? "blue" : actor.role === "teacher" ? "amber" : "violet",
+    avatarLabel: actor.role === "admin" ? "管" : actor.role === "teacher" ? "师" : "学",
+  });
   const team = await createTeam(admin.id, "唯笃队·课堂演示（模拟数据）"); teamId = team.id;
   await joinTeam(student.id, team.inviteCode); await joinTeam(teacher.id, team.inviteCode);
   await updateMemberRole(admin.id, team.id, teacher.id, "teacher");

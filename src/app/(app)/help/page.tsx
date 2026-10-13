@@ -39,7 +39,7 @@ export default function HelpPage() {
         <Chapter id="start" number="01" title="开始使用">
           <p>每位成员和教师使用独立账号。团队管理成员与角色，项目管理目标、任务、阶段和成果。首次使用建议先完成一次「创建任务 → 记录协作 → 提交成果 → 查看反馈」流程。</p>
           <div className="flex gap-3"><Link href="/teams" className="ac-btn">进入团队</Link><Link href="/projects" className="ac-btn-ghost">查看项目</Link><QuickstartTour /></div>
-          <p>顶部「新手教程」提供完整使用指南和当前页面操作指引。账户菜单提供个人日程、设置与退出入口。</p>
+          <p>顶部「新手教程」提供完整使用指南和当前页面操作指引。账户菜单提供我的主页、个人日程、设置与退出入口。</p>
         </Chapter>
         <Chapter id="roles" number="02" title="角色操作流程">
           <p>先确认团队角色，再按对应流程操作。团队管理员、项目成员、指导教师具有不同权限。</p>
@@ -65,6 +65,7 @@ export default function HelpPage() {
           <Link href="/notifications" className="inline-flex items-center gap-1 text-primary">进入通知中心<ArrowRight size={14} /></Link>
         </Chapter>
         <Chapter id="personal" number="07" title="个人 AI 与日程">
+          <h3 className="font-medium text-ink">个人主页与团队分工</h3><p>在团队成员页点击姓名或头像，查看个人介绍、技能、共同团队的项目、负责的任务和正式成果。在账户菜单进入自己的主页，通过「编辑个人资料」维护姓名、简介、技能和头像。任务数量用于了解工作分布，不作为贡献评分；私人日程、私有文档及 AI 会话不进入个人主页。</p>
           <h3 className="font-medium text-ink">配置自己的 AI 助手</h3><ol className="list-decimal space-y-2 pl-5"><li>在<Link href="/settings" className="text-primary underline">设置</Link>中选择服务商，填写支持的模型与个人 API 密钥，设置助手名称及表达偏好。</li><li>保存后测试已保存的连接；测试会调用该服务商，额度和计费以服务商规则为准。</li><li>项目聊天、迭代草案、个人规划与文档写作使用当前账号配置。没有配置也能使用基本协作和规则规划。</li><li>AI 生成的方案先作为草案或预览，核对后确认。文档 AI 仅发送本次选中文字，确认后才替换选区。</li></ol>
           <h3 className="font-medium text-ink">课表、临时事件与短期计划</h3><p>在个人日程页导入 ICS／CSV 或手动记录课程与占用时间，设置可投入时间后，在项目个人短期计划中生成安排。临时事件无需填写具体原因，确认新草案后才替换旧安排。</p><p>日程默认私有。仅本人主动选择共享的时间，才会在团队忙碌日程中展示模糊时段，具体事件内容不会显示给组员或教师。</p>
         </Chapter>

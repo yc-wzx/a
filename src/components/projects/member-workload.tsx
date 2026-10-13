@@ -68,6 +68,9 @@ export async function MemberWorkloadPanel({
               </span>
             </summary>
             <div className="mt-3 border-t border-line pt-3">
+              <Link className="mr-4 text-xs text-primary underline" href={`/people/${row.id}`}>
+                查看个人主页
+              </Link>
               <Link
                 className="text-xs text-primary underline"
                 href={`/projects/${projectId}?view=list&assignee=${row.id}`}
