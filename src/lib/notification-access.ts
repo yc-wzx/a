@@ -30,7 +30,17 @@ export async function notificationResult<T>(run: (actorId: string) => Promise<T>
 export async function notificationHttp<T>(run: (actorId: string) => Promise<T>, request?: Request) {
   if (request && request.method !== "GET") {
     const origin = request.headers.get("origin");
-    if ((origin && origin !== new URL(request.url).origin) || request.headers.get("sec-fetch-site") === "cross-site") {
+    let expectedOrigin: string;
+    try {
+      // Behind the deployment proxy request.url can contain the internal HTTP address.
+      // Use the configured public origin; never trust a caller's forwarded host.
+      const expected = new URL(process.env.AUTH_URL || process.env.AGILECAMPUS_URL || request.url);
+      if (!["http:", "https:"].includes(expected.protocol) || expected.username || expected.password) throw Error("Invalid public origin");
+      expectedOrigin = expected.origin;
+    } catch {
+      return NextResponse.json({ ok: false, code: "FORBIDDEN", error: "请求来源不正确" }, { status: 403 });
+    }
+    if ((origin && origin !== expectedOrigin) || request.headers.get("sec-fetch-site") === "cross-site") {
       return NextResponse.json({ ok: false, code: "FORBIDDEN", error: "请求来源不正确" }, { status: 403 });
     }
   }

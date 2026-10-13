@@ -78,7 +78,7 @@ try {
   const denied = await api(b, `/api${base}/documents/${docId}`); assert.equal(denied.status, 403); const hidden = await api(b, `/api${base}/documents?q=协作设计说明`); assert.equal(hidden.body.data.total, 0); pass("个人草稿撤回分享后正文、搜索标题及数量均不可见");
   await a.screenshot({ path: path.join(output, "document-settings.png"), fullPage: true });
   await a.getByRole("button", { name: "移到回收站", exact: true }).click(); await a.getByRole("dialog").getByRole("button", { name: "移到回收站", exact: true }).click(); await a.waitForURL("**/documents");
-  await a.getByRole("button", { name: "回收站", exact: true }).click(); await a.getByRole("button", { name: "恢复", exact: true }).click(); await a.getByRole("button", { name: "全部文档", exact: true }).click(); await a.getByRole("link", { name: "协作设计说明", exact: true }).waitFor(); pass("回收站删除与恢复保留正文及关联");
+  await a.getByRole("button", { name: "回收站", exact: true }).click(); await a.locator("article").filter({ hasText: "协作设计说明" }).getByRole("button", { name: "恢复", exact: true }).click(); await a.getByRole("button", { name: "全部文档", exact: true }).click(); await a.getByRole("link", { name: "协作设计说明", exact: true }).waitFor(); pass("回收站删除与恢复保留正文及关联");
   await a.locator('input[type="file"]').setInputFiles({ name: "导入试用.md", mimeType: "text/markdown", buffer: Buffer.from("# 试用总结\n\n- [x] 测试正常流程\n\n| 情况 | 结果 |\n|---|---|\n| 正常 | 通过 |\n") });
   await a.getByRole("button", { name: "创建并打开", exact: true }).click(); await a.waitForURL(/\/documents\/[a-f0-9-]+$/); await editor(a).locator("table").waitFor(); await saved(a);
   await a.getByRole("button", { name: "导出", exact: true }).click();
