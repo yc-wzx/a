@@ -1,0 +1,22 @@
+{
+  "origin": "https://weidu-agilecampus.pw",
+  "checks": [
+    {
+      "role": "admin",
+      "login": "passed",
+      "preparedData": "retained"
+    },
+    {
+      "role": "student",
+      "login": "passed",
+      "preparedData": "retained"
+    },
+    {
+      "role": "teacher",
+      "login": "passed",
+      "preparedData": "retained"
+    }
+  ],
+  "errors": [],
+  "presentation": "browser only"
+}
