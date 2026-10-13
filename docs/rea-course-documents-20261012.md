@@ -27,7 +27,7 @@
 | D8 | 飞书通过文档分享管理访问权限。[官方说明](https://www.feishu.cn/hc/zh-CN/articles/945900971706-快速上手文档) | 使用阅读/评论/编辑三档、项目权限与私人草稿；后台每次请求校验，不能只隐藏按钮。 |
 | D9 | 飞书介绍 Markdown 创作与文档导出，PingCode 介绍 Markdown 迁移。[飞书](https://www.feishu.cn/hc/zh-CN/articles/945900971706-快速上手文档)、[PingCode](https://www.pingcode.com/zh/product/wiki) | 首批 Markdown 导入/导出与浏览器打印；不引入 Office 转换服务，保留支持格式的明确边界。 |
 | D10 | 文档恢复符合本项目已提出的误删恢复目标；本条不声称已验证某商业平台的回收站实现。 | 软删除、回收站、恢复；删除后停止协作写入，历史和关联记录保留并正确提示。 |
-| D11 | PingCode 介绍文档增强、润色、语法及翻译等 AI 能力。[官方说明](https://www.pingcode.com/zh/product/wiki) | 使用当前用户已配置的 AI，对选中文字或当前文档生成建议，先预览后确认；不共用团队 API Key。 |
+| D11 | PingCode 介绍文档增强、润色、语法及翻译等 AI 能力。[官方说明](https://www.pingcode.com/zh/product/wiki) | 使用当前用户已配置的 AI，对选中文字生成建议，先预览后确认；不共用团队 API Key，不自动发送全文。 |
 
 ## 实际 REA 分析对象与证据
 

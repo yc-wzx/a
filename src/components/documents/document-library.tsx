@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { displayDateTime } from "@/lib/display-time";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { FileText, FolderOpen, Plus, Search, Trash2, Upload, RotateCcw, Lock } from "lucide-react";
@@ -82,7 +83,7 @@ export function DocumentLibrary({ projectId, initial, canCreate }: { projectId: 
         {list.items.map((item) => <article key={item.id} className="ac-card flex items-start justify-between gap-4 p-4">
           <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-xs text-ink-soft"><span>{item.folder || "未分类"}</span>{item.visibility === "private" && <span className="inline-flex items-center gap-1"><Lock size={11} />个人草稿</span>}<span>{item.permission === "edit" ? "可编辑" : item.permission === "comment" ? "可评论" : "只读"}</span></div>
             {trash ? <h2 className="mt-1 break-words font-medium">{item.title}</h2> : <Link href={`/projects/${projectId}/documents/${item.id}`} className="mt-1 block break-words font-medium text-ink hover:text-primary">{item.title}</Link>}
-            <p className="mt-2 line-clamp-2 break-words text-sm text-ink-soft">{item.excerpt || "暂无正文"}</p><p className="mt-3 text-xs text-ink-faint">{item.ownerName} · {new Date(item.updatedAt).toLocaleString("zh-CN")}</p>
+            <p className="mt-2 line-clamp-2 break-words text-sm text-ink-soft">{item.excerpt || "暂无正文"}</p><p className="mt-3 text-xs text-ink-faint">{item.ownerName} · {displayDateTime(item.updatedAt)}</p>
           </div>{trash && item.canManage && <button className="ac-btn-ghost" disabled={busy} onClick={() => void restore(item)}><RotateCcw size={14} />恢复</button>}
         </article>)}
         <div className="flex items-center justify-end gap-2">{list.total > 0 && <span className="text-xs text-ink-soft">第 {Math.floor(offset / 50) + 1} 页</span>}{offset > 0 && <button className="ac-btn-ghost" onClick={() => void load({ offset: Math.max(0, offset - 50) })} disabled={busy}>上一页</button>}{list.nextOffset !== null && <button className="ac-btn-ghost" onClick={() => void load({ offset: list.nextOffset! })} disabled={busy}>下一页</button>}</div>

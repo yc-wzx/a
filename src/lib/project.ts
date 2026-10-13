@@ -232,6 +232,9 @@ export async function listMyProjects(actorId: string) {
       status: projects.status,
       teamId: projects.teamId,
       teamName: teams.name,
+      description: projects.description,
+      startDate: projects.startDate,
+      endDate: projects.endDate,
       createdAt: projects.createdAt,
     })
     .from(projects)
@@ -260,6 +263,7 @@ export async function listMyProjects(actorId: string) {
     const mine = stats.filter((s) => s.projectId === p.id);
     const total = mine.reduce((n, s) => n + s.count, 0);
     const doneCount = mine.find((s) => s.status === "done")?.count ?? 0;
-    return { ...p, taskTotal: total, doneCount };
+    const doingCount = mine.find((s) => s.status === "doing")?.count ?? 0;
+    return { ...p, taskTotal: total, doneCount, doingCount };
   });
 }
