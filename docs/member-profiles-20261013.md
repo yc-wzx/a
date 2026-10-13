@@ -41,3 +41,11 @@
 - 现有本地测试库曾通过 schema push 更新，账本较旧；验证时只对该独立测试库执行新表 SQL，完整迁移另在新建的独立空库验证，没有手工改写正式库账本。
 
 结构化结果见 [本地浏览器](verification/member-profiles-local-20261013.json)和[迁移验证](verification/member-profiles-migration-20261013.json)。三位正式演示账号在上线时补充模拟简介、技能和头像，继续使用既有演示数据；不会重新初始化或覆盖其他账号的资料。
+
+## 正式网站上线
+
+2026-10-13 已随 [PR #40](https://github.com/yc-wzx/agilecampus/pull/40) 发布至 [AgileCampus](https://weidu-agilecampus.pw)，应用版本 `039daac5e64cc66896eb907f263461062165bb14`，[Linux 发布构建](https://github.com/yc-wzx/agilecampus/actions/runs/38355042871)通过。
+
+三个原演示账号补充了模拟简介、技能和头像；更新后保留 **19 位用户、11 个项目、23 项任务**，迁移账本为 19 条。原数据库容器、认证配置和个人 AI 加密密钥保留，全部用户密码哈希的发布前后校验一致。
+
+正式网址完成同样的 **9 组电脑浏览器检查**，没有未捕获页面异常，1366／1440 宽度无横向溢出；资料编辑预演后恢复原介绍、姓名、技能与头像。结果见 [线上验证记录](verification/member-profiles-live-20261013.json)。桌面私有展示流程已增加三角色主页的直达链接，继续按仅访问网站的方式展示。
