@@ -76,7 +76,7 @@ async function write(page, button) {
 }
 try {
   const { page, context } = await login(student);
-  await page.getByRole("link", { name: "我的课表与日程", exact: true }).click();
+  await page.goto(origin + "/schedule");
   await page.waitForURL("**/schedule");
   await page.getByLabel("每天最多投入（分钟）", { exact: true }).fill("120");
   await write(
@@ -284,11 +284,18 @@ try {
   await teacher.page.reload();
   data = await (await teacher.page.request.get(apiURL)).json();
   assert.deepEqual(data.members.find((m) => m.id === student.id).periods, []);
+  // Next.js reuses this page during query-only navigation. The original selections
+  // must be reloaded even when the generator was already mounted without a seed.
+  await page.goto(origin + "/projects/" + projectId + "/personal-plan");
   await page
-    .getByRole("link", { name: "课表驱动项目：重新规划", exact: true })
+    .getByRole("link", { name: "按新日程重新规划", exact: true })
     .click();
   await page.getByText(/正在按新日程重新规划/).waitFor();
   assert.ok(await page.getByRole("checkbox").isChecked());
+  assert.equal(
+    await page.getByLabel("本期想推进的目标（可选）", { exact: true }).inputValue(),
+    "浏览器短期目标",
+  );
   await page.locator('input[name="startDate"]').fill(startDate);
   await page
     .getByLabel("本期想推进的目标（可选）", { exact: true })
