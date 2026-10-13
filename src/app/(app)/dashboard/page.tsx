@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
+import { getMyProfile } from "@/lib/member-profile";
 import type { MyActiveIteration, QueryPart } from "@/contracts/p0-p2";
 import { todayInShanghai } from "@/lib/dashboard";
 import {
@@ -170,13 +171,14 @@ export default async function DashboardPage({
   const session = await auth();
   if (!session?.user) redirect("/login");
   const today = todayInShanghai();
-  const [summary, context, teacherAccess] = await Promise.all([
+  const [summary, context, teacherAccess, me] = await Promise.all([
     getMyWorkspaceSummary(session.user.id, {
       revisionsOffset: offset,
       iterationsOffset,
     }),
     getDashboardContext(session.user.id, today),
     getTeacherOverviewAccess(session.user.id).catch(() => false),
+    getMyProfile(session.user.id),
   ]);
   const groups = ready(summary.tasks),
     allTasks = groups?.flatMap((g) => g.tasks),
@@ -238,8 +240,9 @@ export default async function DashboardPage({
       ["teams", "创建或加入团队", "/teams"],
       ["schedule", "我的课表与日程", "/schedule"],
       ["notifications", "通知中心", "/notifications"],
+      ["profile", "我的个人主页", `/people/${session.user.id}`],
       ["ai", "配置个人 AI 助手", "/settings#my-ai"],
-      ["help", "五分钟快速上手", "/help"],
+      ["help", "正式使用指南", "/help"],
     ].map(([id, label, href]) => ({ id, label, href, group: "常用入口" })),
     ...(teacherAccess
       ? [
@@ -307,7 +310,7 @@ export default async function DashboardPage({
             个人工作台 <span className="text-ink-soft">/ {dateLabel}</span>
           </p>
           <h1 className="font-display text-3xl font-semibold text-ink">
-            你好，{session.user.name}{" "}
+            你好，{me.name}{" "}
             <span className="text-ink-soft">· 工作台</span>
           </h1>
           <p className="mt-2 text-sm text-ink-soft">

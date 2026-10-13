@@ -128,11 +128,23 @@ export function QuickstartTour({ label = "开始页面操作指引" }: { label?:
           popover: { title: "文档编辑与协作", description: "在正文协作编辑，用评论、版本和任务面板处理反馈、留存历史、关联工作。先检查保存状态再关闭页面。" },
         },
         {
+          element: "[data-team-members]",
+          popover: { title: "成员与个人主页", description: "按姓名、技能或角色查找成员，点击姓名或查看个人主页，了解共同团队中的任务与成果。" },
+        },
+        {
+          element: '[data-tour="member-introduction"]',
+          popover: { title: "个人介绍", description: "这里展示本人维护的介绍、技能和团队角色。自己的主页提供编辑资料入口。" },
+        },
+        {
+          element: '[data-tour="member-tabs"]',
+          popover: { title: "查看工作与成果", description: "概览汇总参与项目和近期记录；任务可按状态筛选；成果展示正式提交及审核状态。" },
+        },
+        {
           element: '[data-tour="account"]',
           popover: {
             title: "个人设置在这里",
             description:
-              "账户菜单中有我的课表、设置和新手教程。完整教程按负责人、组员、老师分别说明。",
+              "账户菜单提供我的主页、课表、设置和新手教程。完整教程按负责人、组员、老师分别说明。",
           },
         },
       ];

@@ -19,6 +19,9 @@ vi.mock("@/lib/auth", () => ({
     user: { id: "00000000-0000-4000-8000-000000000001", name: "同学" },
   }),
 }));
+vi.mock("@/lib/member-profile", () => ({
+  getMyProfile: async () => ({ name: "同学" }),
+}));
 vi.mock("@/lib/dashboard-context", () => ({
   getDashboardContext: async () => ({
     projects: { state: "ready", data: { items: [], total: 0 } },

@@ -1,0 +1,6 @@
+{
+  "freshInstall": "passed",
+  "migrations": 19,
+  "repeatedRun": "passed",
+  "additiveTable": "user_profiles"
+}
