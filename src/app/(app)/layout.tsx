@@ -4,7 +4,7 @@ import { auth, signOut } from "@/lib/auth";
 import { NotificationNav } from "@/components/notification-nav";
 import {
   GettingStartedHint,
-  QuickstartTour,
+  TutorialMenu,
 } from "@/components/quickstart-tour";
 
 export default async function AppLayout({
@@ -52,13 +52,7 @@ export default async function AppLayout({
               团队
             </Link>
             <NotificationNav actorId={session.user.id} />
-            <Link
-              href="/help"
-              className="whitespace-nowrap rounded-field px-2.5 py-1.5 text-sm text-ink-soft hover:bg-primary-soft"
-            >
-              新手教程
-            </Link>
-            <QuickstartTour />
+            <TutorialMenu />
           </nav>
         </div>
         <details data-tour="account" className="relative shrink-0">

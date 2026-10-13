@@ -12,7 +12,7 @@ const origin = process.env.VERIFY_ORIGIN ?? "http://localhost:3099";
 const output = process.env.VERIFY_OUTPUT_DIR;
 if (!output || !path.isAbsolute(output)) throw Error("Private output directory required");
 fs.mkdirSync(output, { recursive: true, mode: 0o700 });
-if (origin !== "http://localhost:3099") throw Error("This check creates local QA fixtures; local origin required");
+if (!["http://localhost:3099", "http://localhost:3101"].includes(origin)) throw Error("This check creates local QA fixtures; local origin required");
 config({ path: [".env.local", ".env"], quiet: true });
 if (!["localhost", "127.0.0.1"].includes(new URL(process.env.DATABASE_URL).hostname)) throw Error("Local QA database required");
 const sql = postgres(process.env.DATABASE_URL, { onnotice: () => {} });
@@ -27,7 +27,7 @@ await sql.begin(async tx => {
   await tx`insert into tasks(id,project_id,title,status,created_by_id) values(${taskId},${projectId},'完成交互原型','doing',${accounts[0].id})`;
   await tx`insert into tasks(project_id,title,status,created_by_id) values(${projectId},'完成真实试用','doing',${accounts[0].id})`;
 });
-fs.writeFileSync(path.join(output, "accounts.private.json"), JSON.stringify({ accounts, projectId, taskId }), { mode: 0o600 });
+fs.writeFileSync(path.join(output, "accounts.private.json"), JSON.stringify({ accounts, teamId, projectId, taskId }), { mode: 0o600 });
 const browser = await chromium.launch({ headless: true, channel: "msedge", args: ["--no-proxy-server"] });
 const contexts = await Promise.all(accounts.map(() => browser.newContext({ viewport: { width: 1440, height: 1000 } })));
 const pages = await Promise.all(contexts.map(c => c.newPage()));
@@ -83,6 +83,16 @@ try {
   await a.getByRole("button", { name: "创建并打开", exact: true }).click(); await a.waitForURL(/\/documents\/[a-f0-9-]+$/); await editor(a).locator("table").waitFor(); await saved(a);
   await a.getByRole("button", { name: "导出", exact: true }).click();
   await a.screenshot({ path: path.join(output, "document-editor.png"), fullPage: true }); pass("Markdown导入表格与检查项、编辑器显示及导出");
+  if (process.env.VERIFY_INTERFACE === "true") {
+    const archiveId = randomUUID(), archiveTaskId = randomUUID();
+    await sql.begin(async tx => {
+      await tx`insert into projects(id,team_id,name,leader_id,status) values(${archiveId},${teamId},'已归档界面验收示例',${accounts[0].id},'archived')`;
+      await tx`insert into tasks(id,project_id,title,status,created_by_id) values(${archiveTaskId},${archiveId},'归档验收任务','done',${accounts[0].id})`;
+      for (const [pid, tid] of [[projectId, taskId], [archiveId, archiveTaskId]]) await tx`insert into notifications(recipient_id,project_id,type,title,summary,source_type,source_id,href,event_key) values(${accounts[0].id},${pid},'task.assigned','界面验收示例通知','仅用于独立账号界面检查','task',${tid},${`/projects/${pid}?task=${tid}`},${randomUUID()})`;
+    });
+    const { verifyDirectoryInterface } = await import("./verify-directory-interface.mjs");
+    await verifyDirectoryInterface({ page: a, context: contexts[0], origin, projectId, teamId, output, pass });
+  }
   assert.deepEqual(errors, []); pass("三个桌面浏览器会话无未捕获页面异常");
 } catch (error) {
   console.error("Browser verification failed:", error.message);
