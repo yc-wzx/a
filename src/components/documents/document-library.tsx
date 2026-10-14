@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { FileText, FolderOpen, Plus, Search, Trash2, Upload, RotateCcw, Lock } from "lucide-react";
 import type { DocumentList, DocumentSummary } from "@/contracts/documents";
 import { documentMutation, documentRequest, errorMessage } from "./http";
+import { courseDocumentTemplates, courseTemplateContent } from "./course-templates";
 
 const folderOptions = ["调研", "设计", "开发", "测试", "汇报"];
 export function DocumentLibrary({ projectId, initial, canCreate }: { projectId: string; initial: DocumentList; canCreate: boolean }) {
@@ -25,6 +26,7 @@ export function DocumentLibrary({ projectId, initial, canCreate }: { projectId: 
   const [privateDraft, setPrivateDraft] = useState(false);
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [importName, setImportName] = useState("");
+  const [templateId, setTemplateId] = useState("");
   const file = useRef<HTMLInputElement>(null);
   const requestNumber = useRef(0);
   const base = `/api/projects/${projectId}/documents`;
@@ -46,7 +48,7 @@ export function DocumentLibrary({ projectId, initial, canCreate }: { projectId: 
     if (!title.trim()) { setError("请填写文档标题。"); return; }
     setBusy(true); setError("");
     try {
-      const content = markdown === null ? undefined : (await import("./extensions")).importDocumentMarkdown(markdown);
+      const content = markdown === null ? courseTemplateContent(templateId) : (await import("./extensions")).importDocumentMarkdown(markdown);
       const result = await documentMutation<DocumentSummary>(base, "POST", {
         title: title.trim(), folder: newFolder.trim() || "未分类", visibility: privateDraft ? "private" : "project", content });
       router.push(`/projects/${projectId}/documents/${result.id}`);
@@ -60,11 +62,11 @@ export function DocumentLibrary({ projectId, initial, canCreate }: { projectId: 
   return <main className="space-y-5 py-5" data-document-library>
     <header className="flex items-start justify-between gap-4">
       <div><h1 className="font-display text-2xl font-semibold text-ink">项目文档</h1><p className="mt-1 text-sm text-ink-soft">一起写清需求、设计与测试，让资料跟着任务走。</p></div>
-      {canCreate && <div className="flex gap-2"><button className="ac-btn-ghost" onClick={() => file.current?.click()}><Upload size={15} />导入 Markdown</button><button className="ac-btn" onClick={() => { setCreateOpen(true); setMarkdown(null); setImportName(""); }}><Plus size={15} />新建文档</button></div>}
+      {canCreate && <div className="flex gap-2"><button className="ac-btn-ghost" onClick={() => file.current?.click()}><Upload size={15} />导入 Markdown</button><button className="ac-btn" onClick={() => { setCreateOpen(true); setMarkdown(null); setImportName(""); setTemplateId(""); setTitle(""); setNewFolder(folder); setPrivateDraft(false); setError(""); }}><Plus size={15} />新建文档</button></div>}
       <input ref={file} type="file" accept=".md,.markdown,text/markdown,text/plain" className="hidden" onChange={async (event) => {
         const selected = event.target.files?.[0]; if (!selected) return;
         if (selected.size > 300000) { setError("Markdown 文件需小于 300 KB。"); event.target.value = ""; return; }
-        try { setMarkdown(await selected.text()); setImportName(selected.name); setTitle(selected.name.replace(/\.(md|markdown)$/i, "")); setCreateOpen(true); }
+        try { setMarkdown(await selected.text()); setImportName(selected.name); setTitle(selected.name.replace(/\.(md|markdown)$/i, "")); setTemplateId(""); setNewFolder(folder); setPrivateDraft(false); setError(""); setCreateOpen(true); }
         catch { setError("无法读取文件，请重新选择。"); }
         event.target.value = "";
       }} />
@@ -89,6 +91,20 @@ export function DocumentLibrary({ projectId, initial, canCreate }: { projectId: 
         <div className="flex items-center justify-end gap-2">{list.total > 0 && <span className="text-xs text-ink-soft">第 {Math.floor(offset / 50) + 1} 页</span>}{offset > 0 && <button className="ac-btn-ghost" onClick={() => void load({ offset: Math.max(0, offset - 50) })} disabled={busy}>上一页</button>}{list.nextOffset !== null && <button className="ac-btn-ghost" onClick={() => void load({ offset: list.nextOffset! })} disabled={busy}>下一页</button>}</div>
       </section>
     </div>
-    {createOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-6" role="dialog" aria-modal="true" aria-labelledby="new-document-title"><form onSubmit={(event) => { event.preventDefault(); void create(); }} className="ac-card w-full max-w-md space-y-4 p-6"><h2 id="new-document-title" className="text-lg font-semibold">{markdown !== null ? "导入 Markdown" : "新建文档"}</h2>{importName && <p className="text-sm text-ink-soft">{importName} · 将转换为可协作编辑的文档</p>}<label className="block text-sm">标题<input required maxLength={120} autoFocus value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas p-2.5" /></label><label className="block text-sm">目录<input list="document-folders" maxLength={50} value={newFolder} onChange={(event) => setNewFolder(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas p-2.5" placeholder="如：设计" /><datalist id="document-folders">{folderOptions.map((item) => <option key={item} value={item} />)}</datalist></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={privateDraft} onChange={(event) => setPrivateDraft(event.target.checked)} />先保存为个人草稿</label>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<div className="flex justify-end gap-2"><button type="button" className="ac-btn-ghost" disabled={busy} onClick={() => setCreateOpen(false)}>取消</button><button className="ac-btn" disabled={busy}>{busy ? "创建中…" : "创建并打开"}</button></div></form></div>}
+    {createOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-6" role="dialog" aria-modal="true" aria-labelledby="new-document-title">
+      <form onSubmit={(event) => { event.preventDefault(); void create(); }} className="ac-card w-full max-w-md space-y-4 p-6">
+        <h2 id="new-document-title" className="text-lg font-semibold">{markdown !== null ? "导入 Markdown" : "新建文档"}</h2>
+        {importName && <p className="text-sm text-ink-soft">{importName} · 将转换为可协作编辑的文档</p>}
+        {markdown === null && <label className="block text-sm">起始模板<select aria-label="文档模板" value={templateId} onChange={event => {
+          const next = courseDocumentTemplates.find(item => item.id === event.target.value);
+          setTemplateId(event.target.value); setTitle(next?.title ?? ""); setNewFolder(next?.folder ?? folder);
+        }} className="mt-1 w-full rounded-lg border border-line bg-canvas p-2.5"><option value="">空白文档</option>{courseDocumentTemplates.map(item => <option key={item.id} value={item.id}>{item.title} · {item.description}</option>)}</select></label>}
+        <label className="block text-sm">标题<input required maxLength={120} autoFocus value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas p-2.5" /></label>
+        <label className="block text-sm">目录<input list="document-folders" maxLength={50} value={newFolder} onChange={(event) => setNewFolder(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas p-2.5" placeholder="如：设计" /><datalist id="document-folders">{folderOptions.map((item) => <option key={item} value={item} />)}</datalist></label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={privateDraft} onChange={(event) => setPrivateDraft(event.target.checked)} />先保存为个人草稿</label>
+        {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        <div className="flex justify-end gap-2"><button type="button" className="ac-btn-ghost" disabled={busy} onClick={() => setCreateOpen(false)}>取消</button><button className="ac-btn" disabled={busy}>{busy ? "创建中…" : "创建并打开"}</button></div>
+      </form>
+    </div>}
   </main>;
 }
