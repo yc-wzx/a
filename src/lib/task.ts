@@ -344,20 +344,22 @@ export async function setTaskSuccessors(
   actorId: string,
   predecessorId: string,
   successorIds: string[],
+  opts?: { tx: DbTx },
 ) {
-  const [pred] = await db.select().from(tasks).where(eq(tasks.id, predecessorId));
+  const exec = opts?.tx ?? db;
+  const [pred] = await exec.select().from(tasks).where(eq(tasks.id, predecessorId));
   if (!pred) throw new AppError("任务不存在");
   await requireTaskWrite(actorId, pred.projectId);
 
   for (const sid of successorIds) {
     if (sid === predecessorId) throw new AppError("后置任务不可构成循环");
-    const [s] = await db
+    const [s] = await exec
       .select({ projectId: tasks.projectId })
       .from(tasks)
       .where(eq(tasks.id, sid));
     if (!s || s.projectId !== pred.projectId)
       throw new AppError("后置任务不属于该项目");
-    const [back] = await db
+    const [back] = await exec
       .select({ id: taskDependencies.id })
       .from(taskDependencies)
       .where(
@@ -369,14 +371,16 @@ export async function setTaskSuccessors(
     if (back) throw new AppError("后置任务不可构成循环");
   }
 
-  await db.transaction(async (tx) => {
+  const replace = async (tx: DbTx) => {
     await tx.delete(taskDependencies).where(eq(taskDependencies.predecessorId, predecessorId));
     if (successorIds.length > 0) {
       await tx
         .insert(taskDependencies)
         .values(successorIds.map((sid) => ({ predecessorId, successorId: sid })));
     }
-  });
+  };
+  if (opts?.tx) await replace(opts.tx);
+  else await db.transaction(replace);
 }
 
 export async function listProjectDependencies(actorId: string, projectId: string) {

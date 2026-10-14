@@ -9,10 +9,10 @@ import { getTeamMembership } from "@/lib/team";
 import { listTeamResourceUsages } from "@/lib/resource";
 import { ResourceForm } from "./resource-form";
 import { endResourceAction } from "./actions";
+import { displayDateTime } from "@/lib/display-time";
 
 function fmtTime(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getMonth() + 1}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return displayDateTime(d);
 }
 
 function fmtDuration(min: number): string {

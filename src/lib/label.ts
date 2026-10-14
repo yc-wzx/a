@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
+import type { DbTx } from "@/db";
 import { labels, taskLabels, tasks, type LabelColor } from "@/db/schema";
 import { AppError, ForbiddenError, isUniqueViolation } from "./errors";
 import { getTeamMembership, requireTeamRole } from "./team";
@@ -91,8 +92,9 @@ export async function deleteLabel(actorId: string, labelId: string) {
 }
 
 // 全量替换某任务的标签，同构于 lib/task.ts 的 setTaskSuccessors
-export async function setTaskLabels(actorId: string, taskId: string, labelIds: string[]) {
-  const [task] = await db
+export async function setTaskLabels(actorId: string, taskId: string, labelIds: string[], opts?: { tx: DbTx }) {
+  const exec = opts?.tx ?? db;
+  const [task] = await exec
     .select({ id: tasks.id, projectId: tasks.projectId })
     .from(tasks)
     .where(eq(tasks.id, taskId));
@@ -102,7 +104,7 @@ export async function setTaskLabels(actorId: string, taskId: string, labelIds: s
   const unique = [...new Set(labelIds)];
 
   if (unique.length > 0) {
-    const owned = await db
+    const owned = await exec
       .select({ id: labels.id })
       .from(labels)
       .where(and(eq(labels.teamId, access.project.teamId), inArray(labels.id, unique)));
@@ -110,10 +112,12 @@ export async function setTaskLabels(actorId: string, taskId: string, labelIds: s
     if (owned.length !== unique.length) throw new AppError("标签不属于该团队");
   }
 
-  await db.transaction(async (tx) => {
+  const replace = async (tx: DbTx) => {
     await tx.delete(taskLabels).where(eq(taskLabels.taskId, taskId));
     if (unique.length > 0) {
       await tx.insert(taskLabels).values(unique.map((labelId) => ({ taskId, labelId })));
     }
-  });
+  };
+  if (opts?.tx) await replace(opts.tx);
+  else await db.transaction(replace);
 }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { createResourceUsage, endResourceUsage } from "@/lib/resource";
 import { AppError } from "@/lib/errors";
+import { isoLocal } from "@/lib/schedule/types";
 
 export type FormState = { error: string } | null;
 
@@ -26,12 +27,13 @@ export async function createResourceAction(
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const start = new Date(parsed.data.startTime);
-  if (Number.isNaN(start.getTime())) return { error: "开始时间无效" };
+  let start: Date;
+  try { start = new Date(isoLocal(parsed.data.startTime)); }
+  catch { return { error: "开始时间无效" }; }
   let end: Date | undefined;
   if (parsed.data.endTime) {
-    end = new Date(parsed.data.endTime);
-    if (Number.isNaN(end.getTime())) return { error: "结束时间无效" };
+    try { end = new Date(isoLocal(parsed.data.endTime)); }
+    catch { return { error: "结束时间无效" }; }
   }
 
   try {

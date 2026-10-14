@@ -2,12 +2,11 @@
 
 import { useActionState, useRef } from "react";
 import { createResourceAction, type FormState } from "./actions";
+import { displayDateTime } from "@/lib/display-time";
 
-// 当前本地时间 → datetime-local 所需的 "YYYY-MM-DDTHH:mm"
+// Resource input uses Beijing time regardless of the browser's local time zone.
 function nowLocal(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  return displayDateTime(new Date()).replace(" ", "T");
 }
 
 export function ResourceForm({ teamId }: { teamId: string }) {
@@ -36,7 +35,7 @@ export function ResourceForm({ teamId }: { teamId: string }) {
           <input name="purpose" placeholder="如 训练模型 / 采集数据" className="ac-field" />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-ink-soft">开始时间</span>
+          <span className="text-xs font-medium text-ink-soft">开始时间（北京时间）</span>
           <div className="flex gap-2">
             <input ref={startRef} name="startTime" type="datetime-local" className="ac-field" />
             <button
@@ -49,7 +48,7 @@ export function ResourceForm({ teamId }: { teamId: string }) {
           </div>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-ink-soft">结束时间（留空 = 占用中）</span>
+          <span className="text-xs font-medium text-ink-soft">结束时间（北京时间，留空 = 占用中）</span>
           <div className="flex gap-2">
             <input ref={endRef} name="endTime" type="datetime-local" className="ac-field" />
             <button
