@@ -1,15 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   TaskPriorityValue,
   TaskPanelData,
   TaskStatusValue,
 } from "@/contracts/p0-p2";
-import {
-  updateTaskAction,
-  type UpdateTaskState,
-} from "@/app/(app)/projects/[projectId]/actions";
+import { saveTaskAssociationsAction } from "@/app/(app)/projects/[projectId]/tasks/association-actions";
 import {
   deleteTaskV1Action,
   getTaskPanelContextAction,
@@ -96,6 +93,8 @@ export function TaskDetailPanel({
   const [fetchFailed, setFetchFailed] = useState<string | null>(null);
   /** 变化的只有它时重取（保存后、冲突后、以及手工重试）。 */
   const [nonce, setNonce] = useState(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +108,8 @@ export function TaskDetailPanel({
       }
       setFetchFailed(null);
       setFetched(res.data);
+    }).catch(() => {
+      if (!cancelled) { setFetched(null); setFetchFailed("任务详情加载失败，请重试"); }
     });
     return () => {
       cancelled = true;
@@ -144,15 +145,33 @@ export function TaskDetailPanel({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // 打开时记住焦点，关闭时还回去——侧边栏关掉后键盘用户应回到原来那张卡片。
+  // Modal keyboard focus stays in the drawer; closing restores its original entry.
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    return () => previous?.focus?.();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus({ preventScroll: true });
+    return () => {
+      document.body.style.overflow = overflow;
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
   }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.defaultPrevented || document.querySelector("dialog[open]")) return;
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      if (e.key !== "Tab") return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const items = Array.from(root.querySelectorAll<HTMLElement>(
+        'button:not([disabled]),a[href],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]'
+      )).filter(el => el.tabIndex >= 0 && el.getClientRects().length > 0);
+      const first = items[0], last = items.at(-1), active = document.activeElement;
+      if (!first || !last) { e.preventDefault(); root.focus(); return; }
+      if (!root.contains(active) || (e.shiftKey ? active === first : active === last)) {
+        e.preventDefault(); (e.shiftKey ? last : first).focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -167,7 +186,8 @@ export function TaskDetailPanel({
 
     setSaving(true);
     setSaveError(null);
-    const res = await updateTaskV1Action(projectId, taskId, {
+    let res: Awaited<ReturnType<typeof updateTaskV1Action>>;
+    try { res = await updateTaskV1Action(projectId, taskId, {
       requestId: newRequestId(),
       // 原样回传服务端给的时间串，绝不在浏览器侧重新生成
       expectedUpdatedAt: local.task.updatedAt,
@@ -183,8 +203,9 @@ export function TaskDetailPanel({
         startDate: textOrNull(form, "startDate"),
         dueDate: textOrNull(form, "dueDate"),
       },
-    });
-    setSaving(false);
+    }); }
+    catch { setSaveError("保存结果暂时无法确认，输入已保留，请核对后重试"); return; }
+    finally { setSaving(false); }
 
     if (!res.ok) {
       setSaveError(res.error);
@@ -204,11 +225,13 @@ export function TaskDetailPanel({
     if (!confirm("确认删除该任务及其所有子任务？此操作不可恢复。")) return;
     setDeleting(true);
     setSaveError(null);
-    const res = await deleteTaskV1Action(projectId, taskId, {
+    let res: Awaited<ReturnType<typeof deleteTaskV1Action>>;
+    try { res = await deleteTaskV1Action(projectId, taskId, {
       requestId: newRequestId(),
       expectedUpdatedAt: local.task.updatedAt,
-    });
-    setDeleting(false);
+    }); }
+    catch { setSaveError("删除结果暂时无法确认，请重新打开任务核对"); return; }
+    finally { setDeleting(false); }
     if (!res.ok) {
       setSaveError(res.error);
       if (res.code === "CONFLICT") refetch();
@@ -227,6 +250,8 @@ export function TaskDetailPanel({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex justify-end"
       role="dialog"
       aria-modal="true"
@@ -235,6 +260,7 @@ export function TaskDetailPanel({
       <button
         type="button"
         aria-label="关闭"
+        tabIndex={-1}
         onClick={onClose}
         className="fixed inset-0 cursor-default bg-ink/40 backdrop-blur-sm"
       />
@@ -247,6 +273,7 @@ export function TaskDetailPanel({
             </h3>
           </div>
           <button
+            ref={closeRef}
             type="button"
             onClick={onClose}
             aria-label="关闭"
@@ -258,7 +285,7 @@ export function TaskDetailPanel({
 
         {state.error && (
           <div className="space-y-2">
-            <p className="text-sm text-high">{state.error}</p>
+            <p role="alert" className="text-sm text-high">{state.error}</p>
             <button
               type="button"
               onClick={refetch}
@@ -275,7 +302,7 @@ export function TaskDetailPanel({
 
         {task && local && (
           <div className="space-y-5">
-            <TaskEnhancementSection key={taskId} projectId={projectId} taskId={taskId} onSaved={onSaved} />
+            <TaskEnhancementSection key={`enhancements-${taskId}`} projectId={projectId} taskId={taskId} onSaved={onSaved} />
             <TaskDocumentLinks key={`docs-${taskId}`} projectId={projectId} taskId={taskId} />
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
               <Meta label="状态" value={STATUS_LABEL[task.status]} />
@@ -314,7 +341,7 @@ export function TaskDetailPanel({
               <form
                 // 服务端每次回来的 updatedAt 都不同：用它当 key，冲突刷新后表单会重挂载，
                 // 输入框回到最新值，而不是留着用户手里那份过期内容。
-                key={task.updatedAt}
+                key={`fields-${task.updatedAt}`}
                 onSubmit={handleSave}
                 className="space-y-2.5 border-t border-line pt-4"
               >
@@ -423,7 +450,7 @@ export function TaskDetailPanel({
                   </Field>
                 </div>
 
-                {saveError && <p className="text-sm text-high">{saveError}</p>}
+                {saveError && <p role="alert" className="text-sm text-high">{saveError}</p>}
 
                 <div className="flex items-center justify-end gap-2 pt-1">
                   <button
@@ -494,9 +521,10 @@ export function TaskDetailPanel({
 
             {canWrite && local.allowedActions.edit && (
               <LabelDependencyForm
+                key={`associations-${task.updatedAt}`}
                 projectId={projectId}
                 taskId={task.id}
-                taskTitle={task.title}
+                expectedUpdatedAt={task.updatedAt}
                 currentLabelIds={local.labels.map((l) => l.id)}
                 currentSuccessorIds={local.dependencies
                   .filter((d) => d.predecessorId === task.id)
@@ -507,7 +535,7 @@ export function TaskDetailPanel({
               />
             )}
 
-            <TaskComments key={taskId} projectId={projectId} taskId={taskId} />
+            <TaskComments key={`comments-${taskId}`} projectId={projectId} taskId={taskId} />
 
             {canWrite && local.allowedActions.delete && (
               <div className="border-t border-line pt-3">
@@ -554,13 +582,15 @@ function BlockControl({
   async function submit(blocked: boolean) {
     setPending(true);
     setError(null);
-    const res = await setTaskBlockedAction(projectId, taskId, {
+    let res: Awaited<ReturnType<typeof setTaskBlockedAction>>;
+    try { res = await setTaskBlockedAction(projectId, taskId, {
       requestId: newRequestId(),
       expectedUpdatedAt: task.updatedAt,
       isBlocked: blocked,
       blockedReason: blocked ? reason : null,
-    });
-    setPending(false);
+    }); }
+    catch { setError("阻塞状态保存未确认，请核对后重试"); return; }
+    finally { setPending(false); }
     if (!res.ok) {
       setError(res.error);
       if (res.code === "CONFLICT") onReload();
@@ -579,7 +609,7 @@ function BlockControl({
         <p className="text-xs text-ink-faint">
           自 {task.blockedAt?.slice(0, 10) ?? "—"}
         </p>
-        {error && <p className="text-sm text-high">{error}</p>}
+        {error && <p role="alert" className="text-sm text-high">{error}</p>}
         <button
           type="button"
           disabled={pending}
@@ -602,7 +632,7 @@ function BlockControl({
           className="ac-field text-sm"
         />
       </Field>
-      {error && <p className="text-sm text-high">{error}</p>}
+      {error && <p role="alert" className="text-sm text-high">{error}</p>}
       <button
         type="button"
         disabled={pending || reason.trim() === ""}
@@ -616,14 +646,12 @@ function BlockControl({
 }
 
 /**
- * 标签与依赖仍走旧的对象表单 Action。
- * 这两块由既有 CRUD 承担（定稿要求「复用原 CRUD」），V1 契约里没有对应字段，
- * 所以不重造轮子；保存成功后让父级重新取数即可。
+ * Save only associations, with one transaction and the task's original version.
  */
 function LabelDependencyForm({
   projectId,
   taskId,
-  taskTitle,
+  expectedUpdatedAt,
   currentLabelIds,
   currentSuccessorIds,
   allLabels,
@@ -632,38 +660,42 @@ function LabelDependencyForm({
 }: {
   projectId: string;
   taskId: string;
-  taskTitle: string;
+  expectedUpdatedAt: string;
   currentLabelIds: string[];
   currentSuccessorIds: string[];
   allLabels: PanelOption[];
   allTasks: { id: string; title: string }[];
   onSaved: () => void;
 }) {
-  const [state, formAction, pending] = useActionState<
-    UpdateTaskState,
-    FormData
-  >(updateTaskAction, null);
-  const settled = state !== null;
-  const notified = useRef(false);
-
-  useEffect(() => {
-    if (!settled || notified.current) return;
-    notified.current = true;
-    if (state && "ok" in state) onSaved();
-  }, [settled, state, onSaved]);
-
-  const error = state && "error" in state ? state.error : null;
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(newRequestId());
 
   return (
-    <form action={formAction} className="space-y-2.5 border-t border-line pt-4">
-      <input type="hidden" name="taskId" value={taskId} />
-      <input type="hidden" name="projectId" value={projectId} />
-      <input type="hidden" name="title" value={taskTitle} />
+    <form className="space-y-2.5 border-t border-line pt-4"
+      onChange={() => { requestId.current = newRequestId(); }}
+      onSubmit={async event => {
+        event.preventDefault();
+        if (pending) return;
+        const form = new FormData(event.currentTarget);
+        setPending(true); setError(null);
+        try {
+          const result = await saveTaskAssociationsAction(projectId, taskId, {
+            requestId: requestId.current, expectedUpdatedAt,
+            labelIds: form.getAll("labelIds").map(String),
+            successorIds: form.getAll("successorIds").map(String),
+          });
+          if (!result.ok) { setError(result.error); return; }
+          onSaved();
+        } catch { setError("标签与依赖保存未确认，选择已保留，请核对后重试"); }
+        finally { setPending(false); }
+      }}>
 
       {allLabels.length > 0 && (
         <Field label="标签（可多选）">
           <select
             multiple
+            disabled={pending}
             name="labelIds"
             defaultValue={currentLabelIds}
             className="ac-field text-sm"
@@ -681,6 +713,7 @@ function LabelDependencyForm({
       <Field label="后置任务（可多选）">
         <select
           multiple
+          disabled={pending}
           name="successorIds"
           defaultValue={currentSuccessorIds}
           className="ac-field text-sm"
@@ -696,7 +729,7 @@ function LabelDependencyForm({
         </select>
       </Field>
 
-      {error && <p className="text-sm text-high">{error}</p>}
+      {error && <p role="alert" className="text-sm text-high">{error}</p>}
 
       <div className="flex justify-end">
         <button disabled={pending} className="ac-btn-ghost text-sm">

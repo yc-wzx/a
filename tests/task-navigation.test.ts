@@ -66,4 +66,18 @@ describe("task previews preserve the originating page", () => {
     expect(taskTargetFromHref(`//example.invalid/projects/${projectId}?task=${taskId}`)).toBeNull();
     expect(taskTargetFromHref(`/\\example.invalid/projects/${projectId}?task=${taskId}`)).toBeNull();
   });
+
+  it("retains a notification's target comment when previewing from the current page", () => {
+    const commentId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const selected = taskTargetFromHref(`/projects/${projectId}?task=${taskId}&comment=${commentId}`);
+    expect(selected).toEqual({ ...target, commentId });
+    const href = taskPreviewHref("/notifications?unreadOnly=true", selected!);
+    expect(new URL(href, "https://example.invalid").searchParams.get("comment")).toBe(commentId);
+    expect(withoutTaskPreview(href)).toBe("/notifications?unreadOnly=true");
+  });
+
+  it("does not reuse another task's comment target", () => {
+    expect(read(`/projects/${projectId}?task=${taskId}&comment=invalid`)).toEqual(target);
+    expect(taskPreviewHref(`/dashboard?comment=${taskId}`, target)).not.toContain("comment=");
+  });
 });
