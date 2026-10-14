@@ -28,4 +28,15 @@
 .collaboration-carets__caret { border-left: 1px solid; border-right: 1px solid; margin-left: -1px; margin-right: -1px; pointer-events: none; position: relative; word-break: normal; }
 .collaboration-carets__label { border-radius: 3px 3px 3px 0; color: white; font-size: 10px; font-weight: 600; left: -1px; line-height: 1.2; padding: .2rem .3rem; position: absolute; top: -1.2em; user-select: none; white-space: nowrap; }
 .document-prose [data-block-id].document-highlight { background: #f9e7b9; transition: background .3s; }
+.document-body-with-outline { display: grid; grid-template-columns: 165px minmax(0, 1fr); align-items: start; }
+.document-body-with-outline > div { min-width: 0; }
+.document-outline { position: sticky; top: 76px; max-height: calc(100vh - 120px); overflow: auto; padding: 24px 10px 24px 16px; color: var(--color-ink-soft); }
+.document-outline button { overflow-wrap: anywhere; }
+.document-outline button[aria-current=location] { color: var(--color-primary); background: var(--color-primary-soft); }
+.document-body-with-outline .document-prose { padding-left: 24px; padding-right: 28px; }
+.document-selection-menu { z-index: 40; display: flex; align-items: center; gap: 2px; border: 1px solid var(--color-line); border-radius: 10px; padding: 5px; background: var(--color-surface); box-shadow: 0 6px 24px #33271c20; font-size: 12px; }
+.document-selection-menu button { display: flex; align-items: center; gap: 4px; padding: 7px; border-radius: 6px; }
+.document-selection-menu button:hover,.document-selection-menu button[aria-pressed=true] { color: var(--color-primary); background: var(--color-primary-soft); }
+.document-slash-menu { position: fixed; z-index: 40; width: 278px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-surface); box-shadow: 0 6px 24px #33271c20; }
+@media print { .document-outline,.document-selection-menu,.document-slash-menu { display: none !important; } .document-body-with-outline { display: block; } }
 @media print { body * { visibility: hidden; } [data-document-print], [data-document-print] * { visibility: visible; } [data-document-print] { position: absolute; inset: 0; width: 100%; overflow: visible !important; border: 0 !important; box-shadow: none !important; } .document-toolbar,.document-sidebar,.document-actions { display: none !important; } .document-prose { padding: 20px 0; min-height: auto; } .collaboration-carets__caret,.collaboration-carets__label { display: none; } }

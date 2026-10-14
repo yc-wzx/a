@@ -11,6 +11,7 @@ import type { DocumentDetail, DocumentNode, DocumentPermission, DocumentVersion 
 import { documentMutation, documentRequest, errorMessage } from "./http";
 import type { DocumentEditorHandle } from "./document-editor";
 import type { SyncSnapshot } from "./sync-provider";
+import { installDocumentLeaveGuard } from "./leave-guard";
 
 const EditorView = dynamic(() => import("./document-editor"), { ssr: false, loading: () => <p className="p-8 text-sm text-ink-soft">正在加载编辑器…</p> });
 const permissionNames = { read: "可阅读", comment: "可评论", edit: "可编辑" };
@@ -85,6 +86,10 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
     handle.editor.on("selectionUpdate", selection);
     selectionCleanup.current = () => { handle.editor.off("selectionUpdate", selection); };
   }, []);
+  useEffect(() => installDocumentLeaveGuard(
+    () => editorHandle.current?.provider.getSnapshot().pending ?? false,
+    () => window.confirm("文档还有未保存内容。建议先等待保存，或复制、下载正文。确定离开？"),
+  ), []);
   useEffect(() => {
     let active = true;
     const timer = setInterval(() => {
@@ -193,18 +198,19 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
   }
   const sideButtons = [{ id: "comments", label: "评论", icon: MessageSquare }, { id: "versions", label: "版本", icon: History }, { id: "links", label: "任务", icon: Link2 }, { id: "ai", label: "AI", icon: Sparkles }, { id: "settings", label: "设置", icon: Settings2 }] as const;
   return <main className="space-y-4 py-4" data-document-workspace>
-    <div className="flex items-center justify-between"><Link href={`/projects/${detail.projectId}/documents`} className="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-primary" onClick={(event) => {
-      if (sync.pending && !window.confirm("还有未保存内容。离开后可能丢失，确定离开？")) event.preventDefault();
-    }}><ArrowLeft size={14} />项目文档</Link><span className="text-xs text-ink-soft">{permissionNames[sync.permission]} · {detail.visibility === "private" ? "个人草稿" : "项目共享"}</span></div>
+    <div className="flex items-center justify-between"><Link href={`/projects/${detail.projectId}/documents`} className="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-primary"><ArrowLeft size={14} />项目文档</Link><span className="text-xs text-ink-soft">{permissionNames[sync.permission]} · {detail.visibility === "private" ? "个人草稿" : "项目共享"}</span></div>
     <header className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-ink-faint">{detail.folder || "未分类"}</p><h1 className="mt-1 break-words font-display text-2xl font-semibold">{detail.title}</h1><div className="mt-2 flex flex-wrap items-center gap-3 text-xs"><span className={sync.status === "offline" ? "text-amber-700" : "text-ink-soft"} role="status">{statusNames[sync.status]}</span><span className="inline-flex items-center gap-1 text-ink-soft"><Users size={12} />{sync.presence.length} 人在线</span>{sync.presence.map((person) => <span key={person.userId} className="rounded bg-primary-soft px-1.5 py-0.5 text-primary">{person.name}</span>)}</div></div>
-      <div className="document-actions flex gap-2"><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(exportMarkdown)}><Download size={14} />导出</button><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(async () => { await flushedRevision(); window.print(); })}><Printer size={14} />打印</button></div>
+      <div className="document-actions flex gap-2"><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(async () => {
+        const url = new URL(window.location.href); url.search = ""; url.hash = "";
+        await navigator.clipboard.writeText(url.href); setNotice("文档链接已复制。接收人仍需登录并具有文档权限；复制链接不会修改分享范围。");
+      })}><Copy size={14} />复制文档链接</button><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(exportMarkdown)}><Download size={14} />导出</button><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(async () => { await flushedRevision(); window.print(); })}><Printer size={14} />打印</button></div>
     </header>
     {(error || sync.error) && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error || sync.error}</p>}
     {notice && <p role="status" className="rounded-lg bg-primary-soft p-3 text-sm text-primary">{notice}</p>}
     {(["blocked", "restored"].includes(sync.status) || sync.pending && sync.status === "offline") && <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-3 text-sm"><span>先保留当前页面的内容：</span><button className="ac-btn-ghost" onClick={() => void action(async () => { await navigator.clipboard.writeText(editorHandle.current?.editor.getText() ?? ""); setNotice("当前正文已复制。"); })}><Copy size={13} />复制正文</button><button className="ac-btn-ghost" onClick={() => downloadText(JSON.stringify(editorHandle.current?.editor.getJSON(), null, 2), `${safeFilename(detail.title)}-未保存副本.json`)}>下载副本</button><button className="ac-btn-ghost" onClick={() => { if (!sync.pending || window.confirm("请确认已复制或下载未保存内容。现在重新打开？")) window.location.reload(); }}>重新打开</button></div>}
     <nav className="document-actions flex flex-wrap gap-2" aria-label="文档协作面板">{sideButtons.map((button) => <button key={button.id} className={tab === button.id ? "ac-btn" : "ac-btn-ghost"} onClick={() => { if (button.id === "settings" && tab !== "settings") loadSettings(); setTab(tab === button.id ? null : button.id); }} aria-expanded={tab === button.id}><button.icon size={14} />{button.label}{button.id === "comments" && detail.comments.filter((item) => !item.resolvedAt).length > 0 && ` ${detail.comments.filter((item) => !item.resolvedAt).length}`}</button>)}</nav>
     <div className={`grid items-start gap-4 ${tab ? "grid-cols-[minmax(0,1fr)_270px]" : "grid-cols-1"}`}>
-      <section className="ac-card min-w-0 overflow-hidden" data-document-print><h2 className="hidden print:block text-xl font-semibold">{detail.title}</h2><EditorView initial={initialEditor} editable={canEdit} canComment={canComment} onReady={onReady} onSync={onSync} onComment={targetComment} /></section>
+      <section className="ac-card min-w-0 overflow-hidden" data-document-print><h2 className="hidden print:block text-xl font-semibold">{detail.title}</h2><EditorView initial={initialEditor} editable={canEdit} canComment={canComment} onReady={onReady} onSync={onSync} onComment={targetComment} onAi={() => setTab("ai")} /></section>
       {tab && <aside className="document-sidebar ac-card min-w-0 space-y-4 p-4" aria-label="文档协作面板内容">
         <div className="flex justify-between"><h2 className="font-semibold">{sideButtons.find((button) => button.id === tab)?.label}</h2><button aria-label="关闭文档侧栏" onClick={() => setTab(null)} className="text-ink-soft"><X size={15} /></button></div>
         {tab === "comments" && <>

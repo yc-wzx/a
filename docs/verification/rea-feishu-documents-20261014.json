@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-14",
+  "tool": "REA CLI 6.4.0",
+  "scope": "Unauthenticated public Feishu document, passive CDP observations after separately performed browser actions",
+  "target": "https://my.feishu.cn/docx/Vs5IdvCn6oOY5jxmoixcVXU1nQh",
+  "evidence": [
+    {
+      "evidenceId": "ev_2c22221ebff6ea0f28cbe3a652bbf30823a500efe75c0165177497642b3855b0",
+      "operation": "inspect_web_page",
+      "provider": "rea-cdp-browser",
+      "sha256": "ebc83ad26147cc47419e7a7f6b8e6fc7636ae9de01c800041dffae9242a31fef",
+      "targetOrigin": "https://my.feishu.cn",
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "Observation starts when REA attaches; prior network and console activity is unavailable.",
+        "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+        "Source maps are reported only as declarative URLs and are not fetched.",
+        "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+        "Browser host platform and architecture were not observed."
+      ]
+    },
+    {
+      "evidenceId": "ev_624a0b8f9e1f32bd8d352b1e843b9c296332ed4358e1c3b2611be555cd989566",
+      "operation": "inspect_web_page",
+      "provider": "rea-cdp-browser",
+      "sha256": "57216b45dba2325f7d736c764ba8779f4e6edb2ef30cbdb5a5761bb4ba6fbb60",
+      "targetOrigin": "https://my.feishu.cn",
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "Observation starts when REA attaches; prior network and console activity is unavailable.",
+        "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+        "Source maps are reported only as declarative URLs and are not fetched.",
+        "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+        "Browser host platform and architecture were not observed."
+      ]
+    },
+    {
+      "evidenceId": "ev_192d7461e1d35ff93c82b1b0a6f4c05582708fa5035796990dc1be525f8bc8bb",
+      "operation": "capture_web_screenshot",
+      "provider": "rea-cdp-browser",
+      "sha256": "ec9a2eb057b95c96088eb7b6999fcf4f7488bb4b2f0c25472383ee818ce1fbc1",
+      "targetOrigin": "https://my.feishu.cn",
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "The screenshot contains the visible viewport, including on-screen content.",
+        "REA does not scroll, evaluate JavaScript, or capture beyond the current viewport.",
+        "Browser host platform and architecture were not observed."
+      ]
+    }
+  ],
+  "notObserved": [
+    "authenticated editing",
+    "multi-user synchronization internals",
+    "server implementation",
+    "cross-origin application resources"
+  ]
+}
