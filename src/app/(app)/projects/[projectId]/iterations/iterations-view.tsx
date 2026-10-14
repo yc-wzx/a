@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { TaskLink } from "@/components/tasks/task-link";
 import { useRouter } from "next/navigation";
 import type { CurrentIteration, Iteration, Result, TaskSummary } from "@/contracts/p0-p2";
 import {
@@ -144,12 +145,12 @@ export function IterationsView({
                 >
                   {t.status === "done" ? "已完成" : t.status === "doing" ? "进行中" : "待办"}
                 </span>
-                <a
+                <TaskLink
                   href={`/projects/${projectId}?task=${t.id}`}
                   className="min-w-0 truncate text-ink hover:underline"
                 >
                   {t.title}
-                </a>
+                </TaskLink>
                 {t.isBlocked && <span className="text-xs text-high">已阻塞</span>}
               </li>
             ))}
@@ -266,12 +267,12 @@ export function IterationsView({
           {backlog.map((task, index) => (
             <li key={task.id} className="flex items-center gap-2 py-2">
               <span className="w-6 text-xs text-ink-faint">{index + 1}</span>
-              <a
+              <TaskLink
                 href={`/projects/${projectId}?task=${task.id}`}
                 className="min-w-0 flex-1 truncate text-sm text-ink hover:underline"
               >
                 {task.title}
-              </a>
+              </TaskLink>
               {task.dueDate && <span className="text-xs text-ink-faint">{task.dueDate}</span>}
               {canWrite && (
                 <span className="flex gap-1">

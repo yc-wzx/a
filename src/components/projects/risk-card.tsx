@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import type { RiskItem } from "@/contracts/p0-p2";
 import { formatAsOf } from "./format";
 

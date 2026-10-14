@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import type { MyTask } from "@/lib/dashboard";
 
 // E / P0：本项目的「我的待办」。

@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { Columns3, List, ChartGantt } from "lucide-react";
-import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
+import { openTaskPreview } from "@/lib/task-navigation";
 import {
   parseTaskSort,
   parseTaskView,
@@ -54,7 +54,7 @@ export function TaskWorkspace(props: {
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }),
     );
   }
-  const open = (id: string) => change("task", id);
+  const open = (id: string) => openTaskPreview(`/projects/${props.projectId}?task=${id}`);
   const sorted = sortTasks(tasks, sort);
   const columns = deriveColumns(groupBy, { members, milestones });
   return (
@@ -202,14 +202,6 @@ export function TaskWorkspace(props: {
           milestones={milestones}
           onOpen={open}
           activeId={taskId}
-        />
-      )}
-      {taskId && (
-        <TaskDetailPanel
-          projectId={props.projectId}
-          taskId={taskId}
-          onClose={() => change("task", null)}
-          onSaved={() => startTransition(() => router.refresh())}
         />
       )}
     </div>

@@ -29,7 +29,7 @@ import { TaskDocumentLinks } from "@/components/documents/task-document-links";
 // 每次都重新鉴权，不信任调用方传来的任务内容；也因此谁都能只拿两个 id 把它挂起来。
 // `onSaved` 只在服务端确认写入成功后触发，给父级刷新看板卡片用。
 //
-// 打开/关闭仍由父级（看板）通过 URL 的 ?task= 驱动，面板不管这件事。
+// 打开/关闭由登录布局中的单例宿主通过 URL 驱动，面板只处理详情与权限。
 //
 // 保存带回载入时拿到的 expectedUpdatedAt，由服务端在事务内锁行比对（定稿 §9.1）；
 // CONFLICT 时如实提示并**自己重取**，绝不假装保存成功。
