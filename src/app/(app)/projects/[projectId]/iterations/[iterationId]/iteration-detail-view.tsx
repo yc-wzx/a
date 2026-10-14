@@ -1,4 +1,5 @@
 "use client";
+import { TaskLink } from "@/components/tasks/task-link";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -464,12 +465,12 @@ export function IterationDetailView({
               >
                 {task.status === "done" ? "已完成" : task.status === "doing" ? "进行中" : "待办"}
               </span>
-              <a
+              <TaskLink
                 href={`/projects/${projectId}?task=${task.id}`}
                 className="min-w-0 flex-1 truncate text-sm text-ink hover:underline"
               >
                 {task.title}
-              </a>
+              </TaskLink>
               {task.assigneeName && <span className="text-xs text-ink-faint">{task.assigneeName}</span>}
               {task.isBlocked && <span className="text-xs text-high">已阻塞</span>}
               {editable && (

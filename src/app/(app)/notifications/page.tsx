@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import { redirect } from "next/navigation";
 import { Bell, CheckCircle2, Clock3, FileCheck2, FolderKanban, MessageSquare } from "lucide-react";
 import { auth } from "@/lib/auth";

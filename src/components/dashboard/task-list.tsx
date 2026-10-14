@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { TaskLink } from "@/components/tasks/task-link";
 import { ArrowUpRight, Search, ListTodo, X } from "lucide-react";
 import type { TaskGroup, TaskGroupKey } from "@/lib/dashboard";
 
@@ -174,7 +175,7 @@ export function DashboardTaskList({ groups }: { groups: TaskGroup[] }) {
                 <ul className="divide-y divide-line">
                   {g.tasks.map((t) => (
                     <li key={t.id}>
-                      <Link
+                      <TaskLink
                         href={`/projects/${t.projectId}?task=${t.id}`}
                         className="workspace-task group"
                       >
@@ -211,7 +212,7 @@ export function DashboardTaskList({ groups }: { groups: TaskGroup[] }) {
                           aria-hidden
                           className="size-4 shrink-0 text-primary/50"
                         />
-                      </Link>
+                      </TaskLink>
                     </li>
                   ))}
                 </ul>

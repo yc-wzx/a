@@ -26,8 +26,8 @@ export function TaskCard({
   dependencies: { predecessorId: string; successorId: string }[];
   onOpen: () => void;
 }) {
-  // 详情面板由 Board 统一托管（全局单例），卡片只负责「报告被点了」。
-  // 深链 ?task= 的读取也上提到了 Board，卡片不再是 URL 的消费者。
+  // 登录布局统一托管详情面板；卡片仅把点击交给 TaskWorkspace。
+  // 打开详情只更新浏览器历史，不重新跳转项目页。
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: !canWrite,

@@ -72,7 +72,7 @@ export default async function ProjectPage({
     (role === "admin" || role === "student") && project.status !== "archived";
   const isAdmin = role === "admin";
 
-  // 详情侧边栏由 URL 的 ?task= 驱动，但**取数在面板自己手里**（定稿 9.2 侧边栏契约）：
+  // 登录布局的单例详情侧栏由 URL 驱动，取数仍由面板自己处理：
   // 它按 taskId 调 getTaskPanelContextAction，挂载与切换都重新鉴权。取不到只影响面板本身，
   // 用户还在看板上，不会因为一个失效的深链就丢掉整页上下文。
 

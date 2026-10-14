@@ -1,4 +1,5 @@
 "use client";
+import { openTaskPreview } from "@/lib/task-navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
@@ -124,7 +125,7 @@ export function WorkspaceCommandMenu({
                         value={`${e.label} ${e.detail ?? ""} ${e.id}`}
                         onSelect={() => {
                           dialog.current?.close();
-                          router.push(e.href);
+                          if (!openTaskPreview(e.href)) router.push(e.href);
                         }}
                       >
                         <div className="min-w-0 flex-1">

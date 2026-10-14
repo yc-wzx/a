@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import { randomUUID } from "node:crypto";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 
 import { createTaskFromFeedbackAction } from "./actions";
 

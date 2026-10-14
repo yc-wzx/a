@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import { displayDateTime } from "@/lib/display-time";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";

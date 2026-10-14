@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-10-13T16:32:50.964Z",
+  "origin": "http://localhost:3008",
+  "isolatedFixture": true,
+  "checks": [
+    "在工作台侧栏保存任务后，原页面即时显示修改",
+    "恢复本地测试任务标题并关闭，仍停留工作台"
+  ],
+  "restored": true
+}

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,

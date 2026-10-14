@@ -4,6 +4,7 @@ import { auth, signOut } from "@/lib/auth";
 import { NotificationNav } from "@/components/notification-nav";
 import { getMyProfile } from "@/lib/member-profile";
 import { MemberAvatar } from "@/components/people/member-avatar";
+import { TaskDrawerHost } from "@/components/tasks/task-drawer-host";
 import {
   GettingStartedHint,
   TutorialMenu,
@@ -110,6 +111,7 @@ export default async function AppLayout({
       <div className="mx-auto max-w-6xl p-6">
         <GettingStartedHint userId={session.user.id} />
         {children}
+        <TaskDrawerHost />
       </div>
     </div>
   );

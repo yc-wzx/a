@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import { getProjectForUser } from "@/lib/project";
 import { listProjectTasks } from "@/lib/task";
 import { listTeamMembers } from "@/lib/team";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, Clock3, FileText, ListTodo, Pencil, Users } from "lucide-react";
 import { z } from "zod";

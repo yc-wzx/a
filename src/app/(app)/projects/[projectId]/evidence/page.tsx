@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TaskLink as Link } from "@/components/tasks/task-link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { ProjectNav } from "@/components/projects/project-nav";
