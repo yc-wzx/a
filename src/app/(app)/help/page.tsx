@@ -46,6 +46,9 @@ export default function HelpPage() {
           {roleGuides.map((guide, i) => <details key={guide.title} className="rounded-xl border border-line bg-canvas/40" open={i === 0}><summary className="cursor-pointer px-4 py-3 font-medium text-ink">{guide.title}</summary><ol className="space-y-4 px-5 pb-5">{guide.steps.map(([label, description], index) => <li key={label} className="flex items-start gap-3"><span className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary-soft text-[11px] text-primary">{index + 1}</span><div><h3 className="font-medium text-ink">{label}</h3><p className="mt-1">{description}</p></div></li>)}</ol></details>)}
         </Chapter>
         <Chapter id="tasks" number="03" title="项目与任务管理">
+          <p>在工作台「我的工作」切换任务列表与日历。日历默认按周查看，可切换月或事项，使用「今天」、日期箭头和右侧小月历定位日期。勾选课程与日程、工作安排或截止节点控制显示内容，右侧列出所选日期的事项。</p>
+          <p>日历按北京时间显示。任务、里程碑和项目截止日期属于日期节点，不代表实际工作时段；未设置截止日期的任务仍在任务列表。工作安排仅显示已确认个人计划，标为「需要重新核对」时请进入原个人规划页检查，不会自动重新排期。已完成、删除或改派的任务不会作为旧计划工作继续显示。</p>
+          <p>完整个人日程与工作安排仅本人可见，教师和组员不能通过此日历查看具体事务。项目节点遵守当前团队权限；团队忙闲仍按原来的共享设置处理。空白日期只表示没有登记，不能据此判断有空。切换日期读取失败时会明确提示，可点击刷新日历重试。</p>
           <dl className="grid grid-cols-[5rem_1fr] gap-x-4 gap-y-3"><dt className="font-medium text-ink">项目</dt><dd>课程团队要完成的整体工作，包含目标、周期、任务和成果。</dd><dt className="font-medium text-ink">里程碑</dt><dd>阶段节点，例如需求确认、中期展示、结题。删除阶段会解除当前关联，保留任务和历史成果。</dd><dt className="font-medium text-ink">任务</dt><dd>有负责人、截止日期和完成标准的具体工作。任务清单用于核对完成条件，子任务用于独立分工。</dd><dt className="font-medium text-ink">迭代</dt><dd>围绕短期目标安排的一轮工作。计划阶段选择任务，开始后跟踪，结束时处理未完成任务并记录复盘。</dd></dl>
           <p>任务页支持看板、列表、甘特图，三种视图共用筛选和详情。看板用于推进状态，列表用于核对分工，甘特图用于查看排期。常用筛选仅保存在当前账号、当前项目和当前浏览器。</p>
           <p>关注任务后可收到状态与阻塞变化通知。管理员可设置进行中主任务数量建议上限，超过时提醒，但不会阻止操作。</p>

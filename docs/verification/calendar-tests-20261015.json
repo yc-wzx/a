@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-15",
+  "fullRegression": {
+    "passed": 795,
+    "skipped": 2,
+    "failed": 0
+  },
+  "finalCalendarChecks": {
+    "passed": 22,
+    "skipped": 0,
+    "failed": 0
+  },
+  "note": "完整回归后改进多日时段日期标签，最终日历、接口和工作台专项再次通过；两项真实外部 AI 测试按原配置跳过。"
+}
