@@ -25,13 +25,14 @@ export default async function ReferencesPage({
   if (!access) notFound();
   const search = await searchParams;
   const type = REFERENCE_TYPES.find((t) => t.id === search.type)?.id;
+  const referenceId = z.uuid().safeParse(search.referenceId).success ? String(search.referenceId) : undefined;
   const rawOffset = Number(search.offset ?? 0);
   const offset =
     Number.isInteger(rawOffset) && rawOffset >= 0 && rawOffset <= 100000
       ? rawOffset
       : 0;
   const [references, members, stages] = await Promise.all([
-    listProjectReferences(session.user.id, projectId, { type, offset }),
+    listProjectReferences(session.user.id, projectId, { type, offset: referenceId ? 0 : offset, referenceId }),
     listTeamMembers(access.project.teamId),
     listProjectMilestones(session.user.id, projectId),
   ]);
@@ -75,7 +76,7 @@ export default async function ReferencesPage({
           <p className="ac-card p-5 text-sm text-ink-soft">暂无记录。</p>
         )}
         {references.items.map((record) => (
-          <article key={record.id} className="ac-card space-y-3 p-4">
+          <article key={record.id} id={`reference-${record.id}`} className="ac-card scroll-mt-24 space-y-3 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="ac-badge bg-primary-soft text-primary">
                 {REFERENCE_TYPES.find((t) => t.id === record.type)?.name}

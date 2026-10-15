@@ -6,11 +6,12 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { MarkdownManager } from "@tiptap/markdown";
 import type { DocumentNode } from "@/contracts/documents";
+import { knowledgeDocumentNodes } from "@/lib/document-nodes";
 
 export const BlockAnchor = Extension.create({
   name: "blockAnchor",
   addGlobalAttributes() {
-    return [{ types: ["paragraph", "heading", "blockquote", "codeBlock", "table", "bulletList", "orderedList", "taskList", "image"],
+    return [{ types: ["paragraph", "heading", "blockquote", "codeBlock", "table", "bulletList", "orderedList", "taskList", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary"],
       attributes: { id: { default: null, parseHTML: (element) => element.getAttribute("data-block-id"),
         renderHTML: (attributes) => attributes.id ? { "data-block-id": attributes.id } : {} } } }];
   },
@@ -19,7 +20,7 @@ export function baseDocumentExtensions() {
   return [StarterKit.configure({ undoRedo: false, link: { openOnClick: false, protocols: ["https", "http"],
     isAllowedUri: (url, context) => /^https?:/i.test(url) && context.defaultValidate(url) } }),
     Image.configure({ allowBase64: false }), TableKit.configure({ table: { resizable: true } }),
-    TaskList, TaskItem.configure({ nested: true }), BlockAnchor];
+    TaskList, TaskItem.configure({ nested: true }), BlockAnchor, ...knowledgeDocumentNodes()];
 }
 export function importDocumentMarkdown(markdown: string): DocumentNode {
   // Markdown is data; HTML tags remain literal rather than becoming executable DOM.

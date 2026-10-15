@@ -9,13 +9,14 @@ import TaskItem from "@tiptap/extension-task-item";
 import { Extension } from "@tiptap/core";
 import type { DocumentNode } from "@/contracts/documents";
 import { ValidationError } from "./errors";
+import { knowledgeDocumentNodes } from "./document-nodes";
 
-const blocks = ["paragraph", "heading", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule"];
+const blocks = ["paragraph", "heading", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary"];
 const ids = Extension.create({ name: "documentBlockIds", addGlobalAttributes() {
   return [{ types: blocks, attributes: { id: { default: null } } }];
 } });
-export const documentSchema = getSchema([StarterKit.configure({ undoRedo: false }), Image, TableKit, TaskList, TaskItem, ids]);
-const nodes = new Set([...blocks, "doc", "text", "listItem", "taskItem", "tableRow", "tableCell", "tableHeader", "hardBreak"]);
+export const documentSchema = getSchema([StarterKit.configure({ undoRedo: false }), Image, TableKit, TaskList, TaskItem, ids, ...knowledgeDocumentNodes()]);
+const nodes = new Set([...blocks, "doc", "text", "listItem", "taskItem", "tableRow", "tableCell", "tableHeader", "hardBreak", "toggleContent", "documentReference"]);
 const marks = new Set(["bold", "italic", "strike", "underline", "code", "link"]);
 export const EMPTY_DOCUMENT: DocumentNode = { type: "doc", content: [{ type: "paragraph" }] };
 export function safeDocumentUrl(value: unknown) {
@@ -36,6 +37,8 @@ export function validateDocumentContent(input: unknown): DocumentNode {
       const a: Record<string, unknown> = {};
       if (n.attrs.id != null) { if (typeof n.attrs.id !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(n.attrs.id) || usedIds.has(n.attrs.id)) throw new ValidationError("段落标识重复或不正确"); usedIds.add(n.attrs.id); a.id = n.attrs.id; }
       if (n.type === "heading") { const level = Number(n.attrs.level); if (![1,2,3,4,5,6].includes(level)) throw new ValidationError("标题层级不正确"); a.level = level; }
+      if (n.type === "documentCallout") { if (!["note", "question", "risk"].includes(String(n.attrs.kind ?? "note"))) throw new ValidationError("提示块类型不正确"); a.kind = n.attrs.kind ?? "note"; }
+      if (n.type === "documentReference") { if (typeof n.attrs.documentId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(n.attrs.documentId)) throw new ValidationError("引用文档标识不正确"); a.documentId = n.attrs.documentId; }
       if (n.type === "image") { if (!safeDocumentUrl(n.attrs.src)) throw new ValidationError("图片需要有效的 HTTP/HTTPS 链接"); a.src = n.attrs.src; for (const k of ["alt", "title"]) if (typeof n.attrs[k] === "string") a[k] = (n.attrs[k] as string).slice(0,500); }
       if (n.type === "taskItem") a.checked = Boolean(n.attrs.checked);
       if (n.type === "orderedList") a.start = Math.min(10000, Math.max(1, Number(n.attrs.start) || 1));
@@ -44,6 +47,7 @@ export function validateDocumentContent(input: unknown): DocumentNode {
       result.attrs = a;
     }
     if (n.type === "image" && !result.attrs?.src) throw new ValidationError("图片地址不能为空");
+    if (n.type === "documentReference" && !result.attrs?.documentId) throw new ValidationError("引用文档不能为空");
     if (n.marks !== undefined) {
       if (!Array.isArray(n.marks) || n.marks.length > 10) throw new ValidationError("文字格式不正确");
       result.marks = n.marks.map(m => { if (!m || typeof m !== "object" || !marks.has(m.type)) throw new ValidationError("不支持的文字格式"); if (m.type === "link") { if (!safeDocumentUrl(m.attrs?.href)) throw new ValidationError("链接必须使用 HTTP/HTTPS"); if (m.attrs?.target != null && m.attrs.target !== "_blank") throw new ValidationError("文档链接需要在新窗口打开"); if (m.attrs?.rel != null && (typeof m.attrs.rel !== "string" || m.attrs.rel.split(/\s+/).some(s => !["", "noopener", "noreferrer", "nofollow"].includes(s)))) throw new ValidationError("文档链接安全属性不正确"); return { type: "link", attrs: { href: m.attrs?.href, target: "_blank", rel: "noopener noreferrer nofollow" } }; } return { type: m.type }; });
@@ -75,15 +79,21 @@ export function yDocumentContent(ydoc: Y.Doc) {
 export function documentText(node: DocumentNode): string {
   if (node.type === "text") return node.text ?? "";
   if (node.type === "hardBreak") return "\n";
+  if (node.type === "documentReference") return "[引用文档]";
   return (node.content ?? []).map(documentText).join(["paragraph", "heading"].includes(node.type) ? "" : "\n");
 }
 export function documentBlockExists(node: DocumentNode, id: string): boolean { return node.attrs?.id === id || (node.content ?? []).some(n => documentBlockExists(n,id)); }
 function escapeText(text: string) { return text.replace(/([\\`*_\[\]<>])/g,"\\$1"); }
-export function documentMarkdown(node: DocumentNode): string {
-  const children = (node.content ?? []).map(documentMarkdown);
+export function documentMarkdown(node: DocumentNode, reference?: (id: string) => string): string {
+  const children = (node.content ?? []).map(child => documentMarkdown(child, reference));
   if (node.type === "text") { let s = escapeText(node.text ?? ""); for (const m of node.marks ?? []) { if (m.type === "bold") s = `**${s}**`; else if (m.type === "italic") s = `*${s}*`; else if (m.type === "strike") s = `~~${s}~~`; else if (m.type === "code") s = "`" + (node.text??"").replace(/`/g,"\\`") + "`"; else if (m.type === "link") s = `[${s}](${String(m.attrs?.href).replace(/\)/g,"%29")})`; } return s; }
   const joined = children.join("");
   switch (node.type) {
+    case "documentReference": return reference?.(String(node.attrs?.documentId)) ?? "[引用文档]";
+    case "documentCallout": return `> **${({ note: "提示", question: "待确认", risk: "风险" } as Record<string, string>)[String(node.attrs?.kind ?? "note")]}**\n` + children.join("\n\n").split("\n").map(l => "> " + l).join("\n");
+    case "documentToggle": return children.join("\n\n");
+    case "toggleSummary": return "**" + joined + "**";
+    case "toggleContent": return children.join("\n\n");
     case "doc": return children.join("\n\n") + "\n";
     case "paragraph": return joined;
     case "heading": return "#".repeat(Number(node.attrs?.level) || 2) + " " + joined;

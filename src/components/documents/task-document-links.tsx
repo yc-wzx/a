@@ -15,7 +15,7 @@ export function TaskDocumentLinks({ projectId, taskId }: { projectId: string; ta
   }, [projectId, taskId]);
   return <section className="space-y-2 rounded-lg border border-slate-200 p-3">
     <h3 className="flex items-center gap-2 text-sm font-medium"><FileText size={15} />关联文档</h3>
-    {error ? <p className="text-xs text-red-600">{error}</p> : documents ? documents.items.length ? <ul className="space-y-1">{documents.items.map(d => <li key={d.id}><Link className="text-sm text-indigo-700 hover:underline" href={`/projects/${projectId}/documents/${d.id}`}>{d.title}</Link></li>)}</ul> : <p className="text-xs text-slate-500">暂无关联文档。在项目文档中选择本任务即可关联。</p> : <p className="text-xs text-slate-500">加载中…</p>}
+    {error ? <p className="text-xs text-red-600">{error}</p> : documents ? documents.items.length ? <ul className="space-y-1">{documents.items.map(d => <li key={d.id}><Link className="text-sm text-indigo-700 hover:underline" href={`/projects/${projectId}/documents/${d.id}${d.sourceBlockId ? `#block=${encodeURIComponent(d.sourceBlockId)}` : ""}`}>{d.title}{d.sourceBlockId ? " · 来源段落" : ""}</Link></li>)}</ul> : <p className="text-xs text-slate-500">暂无关联文档。在项目文档中选择本任务即可关联。</p> : <p className="text-xs text-slate-500">加载中…</p>}
     <Link href={`/projects/${projectId}/documents`} className="text-xs text-indigo-700 hover:underline">打开项目文档</Link>
   </section>;
 }

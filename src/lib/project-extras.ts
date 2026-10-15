@@ -363,12 +363,13 @@ export async function deleteProjectReference(
 export async function listProjectReferences(
   actorId: string,
   projectId: string,
-  input: { offset?: number; type?: string } = {},
+  input: { offset?: number; type?: string; referenceId?: string } = {},
 ) {
   const options = parse(
     z
       .object({
         offset: z.number().int().min(0).max(100000).default(0),
+        referenceId: z.uuid().optional(),
         type: z
           .enum(["meeting", "document", "video", "prototype", "other"])
           .optional(),
@@ -380,6 +381,7 @@ export async function listProjectReferences(
     const { project, role } = await access(tx, actorId, projectId);
     const condition = and(
       eq(projectReferences.projectId, projectId),
+      options.referenceId ? eq(projectReferences.id, options.referenceId) : undefined,
       options.type ? eq(projectReferences.type, options.type) : undefined,
     );
     const rows = await tx

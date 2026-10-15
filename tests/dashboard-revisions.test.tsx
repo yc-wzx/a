@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import DashboardPage from "@/app/(app)/dashboard/page";
 
+// Async RSC document shortcuts are verified by PostgreSQL/browser tests. This
+// synchronous static renderer isolates the workspace aggregation under test.
+vi.mock("@/components/dashboard/personal-documents", () => ({ DashboardPersonalDocuments: () => null }));
+
 // 页面只经过聚合入口取数，所以在这里挂载桩，
 // 让真实的 getMyWorkspaceSummary 仍然跑到下游服务，覆盖整条接线。
 const mocks = vi.hoisted(() => ({

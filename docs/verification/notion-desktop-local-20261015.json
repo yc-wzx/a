@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-15",
+  "environment": "Isolated migrated PostgreSQL database, Next.js 16.2.10, desktop Edge at 1440x1100",
+  "passed": 11,
+  "uncaughtPageErrors": 0,
+  "checks": [
+    "Student library: project guide, personal bookmarks and actual recent visits",
+    "Local fold state survives reload without changing shared document revision",
+    "Move block, save and undo preserve all paragraph identities",
+    "Selected text creates an assigned task with document and paragraph origin",
+    "Live document reference titles and authorized backlinks",
+    "Type [[ to select and insert a reference",
+    "Global server search, type filtering and keyboard controls",
+    "Selected-source personal AI entry and honest unconfigured-key error",
+    "Teacher can read/comment but cannot move content or create student tasks",
+    "Team admin can pin shared documents into course guide categories",
+    "Declining the Ctrl+K unsaved-content confirmation retains the current document"
+  ],
+  "realProviderInference": "Not exercised: individual users have not configured real API keys. Grounding, quota and access rechecks use model fixtures in PostgreSQL tests."
+}

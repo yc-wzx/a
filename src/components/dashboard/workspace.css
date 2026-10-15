@@ -322,7 +322,7 @@
 .workspace-command {
   padding: 0;
   border: none;
-  width: 580px;
+    width: 760px;
   max-width: 90vw;
   margin: 12vh auto auto;
   background: transparent;

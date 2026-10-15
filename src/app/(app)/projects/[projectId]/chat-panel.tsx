@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { DraftCards, type Draft } from "./draft-cards";
+import { DocumentQuestionAnswer } from "@/components/documents/document-question-answer";
 
 type Option = { id: string; name: string };
 type Msg = { role: "user" | "assistant"; content: string; drafts?: Draft[] };
@@ -28,6 +29,7 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"chat" | "documents">("chat");
 
   async function send() {
     const text = input.trim();
@@ -81,6 +83,11 @@ export function ChatPanel({
         </Link>{" "}
         中配置的模型和密钥。
       </p>
+      <div className="flex gap-2 border-b border-line pb-2" aria-label="助手功能">
+        <button className={mode === "chat" ? "ac-btn px-3 py-1 text-xs" : "ac-btn-ghost text-xs"} aria-pressed={mode === "chat"} onClick={() => setMode("chat")}>项目协作</button>
+        <button className={mode === "documents" ? "ac-btn px-3 py-1 text-xs" : "ac-btn-ghost text-xs"} aria-pressed={mode === "documents"} onClick={() => setMode("documents")}>资料问答</button>
+      </div>
+      {mode === "documents" ? <DocumentQuestionAnswer key={projectId} projectId={projectId} /> : <>
       <p className="text-xs text-ink-soft">
         {scope === "personal" ? "本会话仅本人可读" : "本会话对当前团队成员可读"}
         。修改业务数据需明确确认。
@@ -131,6 +138,7 @@ export function ChatPanel({
           {pending ? "思考中…" : "发送"}
         </button>
       </div>
+      </>}
     </section>
   );
 }

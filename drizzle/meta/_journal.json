@@ -134,6 +134,13 @@
       "when": 1791869954272,
       "tag": "0018_member_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792040638710,
+      "tag": "0019_notion_document_workflow",
+      "breakpoints": true
     }
   ]
 }

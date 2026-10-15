@@ -15,7 +15,9 @@ export function installDocumentLeaveGuard(isPending: () => boolean, confirmLeave
     if (!(event.target instanceof Element) || event.target.closest("[data-document-workspace]")) return;
     if (isPending() && !confirmLeave()) { event.preventDefault(); event.stopImmediatePropagation(); }
   }
+  function navigation(event: Event) { if (isPending() && !confirmLeave()) event.preventDefault(); }
   target.addEventListener("click", anchorClick, true);
   target.addEventListener("submit", submit, true);
-  return () => { target.removeEventListener("click", anchorClick, true); target.removeEventListener("submit", submit, true); };
+  browser.addEventListener?.("agilecampus:before-navigate", navigation);
+  return () => { target.removeEventListener("click", anchorClick, true); target.removeEventListener("submit", submit, true); browser.removeEventListener?.("agilecampus:before-navigate", navigation); };
 }
