@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { runAction } from "@/lib/action-result";
 import { ForbiddenError, ValidationError } from "@/lib/errors";
 import { addDocumentComment, changeDocumentComment, changeDocumentTaskLink, createDocument, createDocumentVersion, exportDocument, getDocumentDetail, getDocumentVersion, listDocuments, previewDocumentAi, restoreDocumentVersion, syncDocument, trashDocument, updateDocument } from "@/lib/documents";
+import { getDocumentKnowledge, setDocumentGuidePin, getDocumentRelations, getPersonalDocuments, setDocumentBookmark, recordDocumentVisit, createTaskFromDocument } from "@/lib/documents";
+import { askProjectDocuments } from "@/lib/documents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,15 +39,20 @@ async function handle(request: NextRequest, context: Context) {
   }
   const result = await runAction(async actor => {
     if (method === "GET") {
+      if (documentId === "knowledge" && !section) return getDocumentKnowledge(actor, projectId);
+      if (documentId === "personal" && !section) return getPersonalDocuments(actor, projectId);
       if (!documentId) {
         const q = request.nextUrl.searchParams;
         return listDocuments(actor, projectId, { q: q.get("q") ?? "", folder: q.get("folder") ?? undefined, trash: q.get("trash") === "true", offset: Number(q.get("offset") ?? 0), taskId: q.get("taskId") ?? undefined });
       }
       if (!section) return getDocumentDetail(actor, projectId, documentId);
+      if (section === "references" && !itemId) return getDocumentRelations(actor, projectId, documentId);
       if (section === "versions") return itemId ? getDocumentVersion(actor, projectId, documentId, itemId) : (await getDocumentDetail(actor, projectId, documentId)).versions;
       throw new ForbiddenError("入口不存在");
     }
     const input = await body(request);
+    if (documentId === "ask" && !section && method === "POST") return askProjectDocuments(actor, projectId, input);
+    if (documentId === "knowledge" && !section && method === "POST") return setDocumentGuidePin(actor, projectId, input);
     if (!documentId && method === "POST") return createDocument(actor, projectId, input);
     if (!documentId) throw new ForbiddenError("入口不存在");
     if (!section) {
@@ -54,6 +61,9 @@ async function handle(request: NextRequest, context: Context) {
       if (method === "POST" && input && typeof input === "object" && "operation" in input && input.operation === "restore") return trashDocument(actor, projectId, documentId, input, true);
     }
     if (section === "sync" && !itemId && method === "POST") return syncDocument(actor, projectId, documentId, input);
+    if (section === "bookmark" && !itemId && method === "POST") return setDocumentBookmark(actor, projectId, documentId, input);
+    if (section === "visit" && !itemId && method === "POST") return recordDocumentVisit(actor, projectId, documentId);
+    if (section === "create-task" && !itemId && method === "POST") return createTaskFromDocument(actor, projectId, documentId, input);
     if (section === "versions" && method === "POST") return itemId ? restoreDocumentVersion(actor, projectId, documentId, itemId, input) : createDocumentVersion(actor, projectId, documentId, input);
     if (itemId) throw new ForbiddenError("入口不存在");
     if (section === "comments") {

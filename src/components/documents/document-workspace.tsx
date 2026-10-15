@@ -6,12 +6,13 @@ import { displayDateTime } from "@/lib/display-time";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
-import { ArrowLeft, Check, Download, History, Link2, MessageSquare, Printer, Settings2, Sparkles, Trash2, X, Users, Copy } from "lucide-react";
-import type { DocumentDetail, DocumentNode, DocumentPermission, DocumentVersion } from "@/contracts/documents";
+import { ArrowLeft, Check, Download, History, Link2, MessageSquare, Printer, Settings2, Sparkles, Trash2, X, Users, Copy, Star, FileText } from "lucide-react";
+import type { DocumentDetail, DocumentNode, DocumentPermission, DocumentVersion, DocumentRelations } from "@/contracts/documents";
 import { documentMutation, documentRequest, errorMessage } from "./http";
 import type { DocumentEditorHandle } from "./document-editor";
 import type { SyncSnapshot } from "./sync-provider";
 import { installDocumentLeaveGuard } from "./leave-guard";
+import { DocumentTaskDialog, type DocumentTaskSource, type DocumentTaskInput } from "./document-task-dialog";
 
 const EditorView = dynamic(() => import("./document-editor"), { ssr: false, loading: () => <p className="p-8 text-sm text-ink-soft">正在加载编辑器…</p> });
 const permissionNames = { read: "可阅读", comment: "可评论", edit: "可编辑" };
@@ -36,7 +37,10 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
   const router = useRouter();
   const [detail, setDetail] = useState(initial);
   const [sync, setSync] = useState<SyncSnapshot>({ status: "connecting", permission: initial.permission, revision: initial.revision, pending: false, presence: [] });
-  const [tab, setTab] = useState<"comments" | "versions" | "links" | "ai" | "settings" | null>("comments");
+  const [tab, setTab] = useState<"comments" | "versions" | "links" | "ai" | "settings" | "references" | null>("comments");
+  const [relations, setRelations] = useState<DocumentRelations>({ outgoing: [], incoming: [] });
+  const [taskSource, setTaskSource] = useState<DocumentTaskSource | null>(null);
+  const [createdTask, setCreatedTask] = useState<{ taskId: string; href: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -66,11 +70,24 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
   const base = `/api/projects/${initial.projectId}/documents/${initial.id}`;
   const canEdit = detail.canEdit && sync.permission === "edit" && !["blocked", "restored"].includes(sync.status);
   const canComment = detail.canComment && ["edit", "comment"].includes(sync.permission) && !["blocked", "restored"].includes(sync.status);
+  const canCreateTask = detail.canCreateTask && !["blocked", "restored"].includes(sync.status);
   const refresh = useCallback(async () => {
-    const next = await documentRequest<DocumentDetail>(base);
-    setDetail(next);
+    const [next, nextRelations] = await Promise.all([documentRequest<DocumentDetail>(base), documentRequest<DocumentRelations>(`${base}/references`)]);
+    setDetail(next); setRelations(nextRelations);
     return next;
   }, [base]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void documentRequest<DocumentRelations>(`${base}/references`, { signal: controller.signal }).then(setRelations).catch(e => { if (!controller.signal.aborted) setError(errorMessage(e)); });
+    void documentMutation(`${base}/visit`, "POST", {}).catch(() => { /* Reading remains available if optional history cannot be recorded. */ });
+    return () => controller.abort();
+  }, [base]);
+  useEffect(() => {
+    if (sync.status !== "saved") return;
+    const controller = new AbortController();
+    void documentRequest<DocumentRelations>(`${base}/references`, { signal: controller.signal }).then(setRelations).catch(e => { if (!controller.signal.aborted) setError(errorMessage(e)); });
+    return () => controller.abort();
+  }, [base, sync.status, sync.revision]);
   const onSync = useCallback((state: SyncSnapshot) => {
     setSync(state);
   }, []);
@@ -108,6 +125,28 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
   async function flushedRevision() {
     if (!editorHandle.current) throw new Error("编辑器正在加载，请稍候。");
     return (await editorHandle.current.provider.flush()).revision;
+  }
+  async function startDocumentTask(editor: Editor) {
+    if (!canCreateTask) return;
+    const { from, to, $from } = editor.state.selection;
+    const selection = editor.state.doc.textBetween(from, to, "\n").trim();
+    if (!selection || selection.length > 2000) { setError("请选择 1 至 2000 字的正文创建任务。"); return; }
+    let blockId = "";
+    for (let depth = $from.depth; depth > 0; depth--) if ($from.node(depth).attrs.id) { blockId = String($from.node(depth).attrs.id); break; }
+    if (!blockId) { setError("来源段落尚未保存，请稍候再试。"); return; }
+    try {
+      const expectedRevision = await flushedRevision();
+      if (editor.state.doc.textBetween(from, to, "\n").trim() !== selection) throw new Error("文字已改变，请重新选择。");
+      setError(""); setTaskSource({ selection, blockId, expectedRevision, epoch: editorHandle.current!.provider.epoch, from, to });
+    } catch(e) { setError(errorMessage(e)); }
+  }
+  async function submitDocumentTask(input: DocumentTaskInput) {
+    const handle = editorHandle.current;
+    if (!handle || !taskSource) return;
+    const revision = await flushedRevision();
+    if (revision !== taskSource.expectedRevision || handle.provider.epoch !== taskSource.epoch || handle.editor.state.doc.textBetween(taskSource.from, taskSource.to, "\n").trim() !== taskSource.selection) throw new Error("正文已更新，请关闭窗口后重新选择文字。");
+    const result = await documentMutation<{ taskId: string; href: string }>(`${base}/create-task`, "POST", { ...taskSource, ...input });
+    setTaskSource(null); setCreatedTask(result); setTab("links"); await refresh(); setNotice("任务已创建，并保留了来源段落。");
   }
   function targetComment(editor: Editor) {
     setReplyTarget(null);
@@ -196,21 +235,22 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
     handle.editor.chain().focus().insertContentAt({ from: aiPreview.from, to: aiPreview.to }, content).run();
     await handle.provider.flush(); setAiPreview(null); setNotice("已应用并保存 AI 修改。");
   }
-  const sideButtons = [{ id: "comments", label: "评论", icon: MessageSquare }, { id: "versions", label: "版本", icon: History }, { id: "links", label: "任务", icon: Link2 }, { id: "ai", label: "AI", icon: Sparkles }, { id: "settings", label: "设置", icon: Settings2 }] as const;
+  const sideButtons = [{ id: "comments", label: "评论", icon: MessageSquare }, { id: "references", label: "文档引用", icon: FileText }, { id: "versions", label: "版本", icon: History }, { id: "links", label: "任务", icon: Link2 }, { id: "ai", label: "AI", icon: Sparkles }, { id: "settings", label: "设置", icon: Settings2 }] as const;
   return <main className="space-y-4 py-4" data-document-workspace>
     <div className="flex items-center justify-between"><Link href={`/projects/${detail.projectId}/documents`} className="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-primary"><ArrowLeft size={14} />项目文档</Link><span className="text-xs text-ink-soft">{permissionNames[sync.permission]} · {detail.visibility === "private" ? "个人草稿" : "项目共享"}</span></div>
     <header className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-ink-faint">{detail.folder || "未分类"}</p><h1 className="mt-1 break-words font-display text-2xl font-semibold">{detail.title}</h1><div className="mt-2 flex flex-wrap items-center gap-3 text-xs"><span className={sync.status === "offline" ? "text-amber-700" : "text-ink-soft"} role="status">{statusNames[sync.status]}</span><span className="inline-flex items-center gap-1 text-ink-soft"><Users size={12} />{sync.presence.length} 人在线</span>{sync.presence.map((person) => <span key={person.userId} className="rounded bg-primary-soft px-1.5 py-0.5 text-primary">{person.name}</span>)}</div></div>
-      <div className="document-actions flex gap-2"><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(async () => {
+      <div className="document-actions flex flex-wrap gap-2"><button type="button" className="ac-btn-ghost" aria-pressed={!!detail.bookmarked} disabled={busy} onClick={() => void action(async () => { await documentMutation(`${base}/bookmark`, "POST", { bookmarked: !detail.bookmarked }); await refresh(); })}><Star size={14} className={detail.bookmarked ? "fill-primary/15 text-primary" : ""} />{detail.bookmarked ? "已收藏" : "收藏"}</button><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(async () => {
         const url = new URL(window.location.href); url.search = ""; url.hash = "";
         await navigator.clipboard.writeText(url.href); setNotice("文档链接已复制。接收人仍需登录并具有文档权限；复制链接不会修改分享范围。");
       })}><Copy size={14} />复制文档链接</button><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(exportMarkdown)}><Download size={14} />导出</button><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(async () => { await flushedRevision(); window.print(); })}><Printer size={14} />打印</button></div>
     </header>
     {(error || sync.error) && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error || sync.error}</p>}
     {notice && <p role="status" className="rounded-lg bg-primary-soft p-3 text-sm text-primary">{notice}</p>}
+    {createdTask && <p className="text-sm"><Link href={createdTask.href} className="text-primary hover:underline">查看刚创建的任务 →</Link></p>}
     {(["blocked", "restored"].includes(sync.status) || sync.pending && sync.status === "offline") && <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-3 text-sm"><span>先保留当前页面的内容：</span><button className="ac-btn-ghost" onClick={() => void action(async () => { await navigator.clipboard.writeText(editorHandle.current?.editor.getText() ?? ""); setNotice("当前正文已复制。"); })}><Copy size={13} />复制正文</button><button className="ac-btn-ghost" onClick={() => downloadText(JSON.stringify(editorHandle.current?.editor.getJSON(), null, 2), `${safeFilename(detail.title)}-未保存副本.json`)}>下载副本</button><button className="ac-btn-ghost" onClick={() => { if (!sync.pending || window.confirm("请确认已复制或下载未保存内容。现在重新打开？")) window.location.reload(); }}>重新打开</button></div>}
     <nav className="document-actions flex flex-wrap gap-2" aria-label="文档协作面板">{sideButtons.map((button) => <button key={button.id} className={tab === button.id ? "ac-btn" : "ac-btn-ghost"} onClick={() => { if (button.id === "settings" && tab !== "settings") loadSettings(); setTab(tab === button.id ? null : button.id); }} aria-expanded={tab === button.id}><button.icon size={14} />{button.label}{button.id === "comments" && detail.comments.filter((item) => !item.resolvedAt).length > 0 && ` ${detail.comments.filter((item) => !item.resolvedAt).length}`}</button>)}</nav>
     <div className={`grid items-start gap-4 ${tab ? "grid-cols-[minmax(0,1fr)_270px]" : "grid-cols-1"}`}>
-      <section className="ac-card min-w-0 overflow-hidden" data-document-print><h2 className="hidden print:block text-xl font-semibold">{detail.title}</h2><EditorView initial={initialEditor} editable={canEdit} canComment={canComment} onReady={onReady} onSync={onSync} onComment={targetComment} onAi={() => setTab("ai")} /></section>
+      <section className="ac-card min-w-0 overflow-hidden" data-document-print><h2 className="hidden print:block text-xl font-semibold">{detail.title}</h2><EditorView initial={initialEditor} editable={canEdit} canComment={canComment} onReady={onReady} onSync={onSync} onComment={targetComment} onAi={() => setTab("ai")} references={relations.outgoing} canCreateTask={canCreateTask} onCreateTask={editor => void startDocumentTask(editor)} /></section>
       {tab && <aside className="document-sidebar ac-card min-w-0 space-y-4 p-4" aria-label="文档协作面板内容">
         <div className="flex justify-between"><h2 className="font-semibold">{sideButtons.find((button) => button.id === tab)?.label}</h2><button aria-label="关闭文档侧栏" onClick={() => setTab(null)} className="text-ink-soft"><X size={15} /></button></div>
         {tab === "comments" && <>
@@ -231,6 +271,7 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
           }}>{item.quote}</button>}<p className="whitespace-pre-wrap break-words text-sm">{item.body}</p><p className="text-[10px] text-ink-faint">{displayDateTime(item.createdAt)}</p><div className="flex flex-wrap gap-3 text-xs text-primary">{canComment && <button disabled={busy} onClick={() => { setReplyTarget({ id: item.id, authorName: item.authorName }); setCommentTarget({ blockId: item.blockId, quote: item.quote }); commentInput.current?.focus(); }}>回复</button>}{canComment && (item.authorId === detail.actorId || canEdit) && <button disabled={busy} onClick={() => void action(async () => { await documentMutation(`${base}/comments`, "PATCH", { commentId: item.id, resolved: !item.resolvedAt }); await refresh(); })}>{item.resolvedAt ? "重新打开" : "标记已解决"}</button>}{item.canDelete && <button disabled={busy} onClick={() => void action(async () => { if (window.confirm("删除这条评论？")) { await documentMutation(`${base}/comments`, "DELETE", { commentId: item.id }); await refresh(); } })}>删除</button>}</div></article>)}
           {!detail.comments.length && <p className="text-sm text-ink-soft">选中正文或点击段落，再使用“评论当前段落”。</p>}
         </>}
+        {tab === "references" && <>{([{ key: "outgoing", label: "本文引用的文档" }, { key: "incoming", label: "引用了本文的文档" }] as const).map(group => <section key={group.key} className="space-y-3"><h3 className="text-xs text-ink-soft">{group.label} · {relations[group.key].length}</h3>{relations[group.key].length ? relations[group.key].map(item => <Link key={item.id} href={item.href} className="block rounded-lg border border-line p-3 hover:bg-primary-soft"><span className="block break-words text-sm text-primary">{item.title}</span><span className="mt-2 block text-xs text-ink-faint">{item.folder}</span></Link>) : <p className="text-xs text-ink-faint">暂无可查看的引用。</p>}</section>)}{canEdit && <p className="text-xs text-ink-soft">在正文中输入 [[，或使用工具栏的“引用项目文档”。</p>}</>}
         {tab === "versions" && <>
           {canEdit && <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); void action(saveVersion); }}><input aria-label="历史版本名称" maxLength={80} placeholder="如：阶段展示版" value={versionLabel} onChange={(event) => setVersionLabel(event.target.value)} className="w-full rounded-lg border border-line bg-canvas p-2 text-sm" /><button className="ac-btn w-full" disabled={busy}>保存当前版本</button></form>}
           {detail.versions.map((item) => <button key={item.id} onClick={() => void action(() => openVersion(item.id))} className="block w-full rounded-lg border border-line p-3 text-left hover:bg-canvas"><span className="block text-sm font-medium">{item.label}</span><span className="mt-1 block text-xs text-ink-soft">{item.authorName} · {displayDateTime(item.createdAt)}</span><span className="mt-1 block text-[10px] text-ink-faint">{item.kind === "manual" ? "手动保存" : item.kind === "restore" ? "恢复前留存" : "自动留存"}</span></button>)}
@@ -262,5 +303,6 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
     </div>
     {deleteOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-6" role="dialog" aria-modal="true" aria-labelledby="delete-document-title"><div className="ac-card max-w-sm space-y-4 p-6"><h2 id="delete-document-title" className="font-semibold">将文档移到回收站？</h2><p className="text-sm text-ink-soft">成员将无法打开此文档，可在项目文档的回收站恢复。正文、评论和版本会保留。</p><div className="flex justify-end gap-2"><button className="ac-btn-ghost" disabled={busy} onClick={() => setDeleteOpen(false)}>取消</button><button className="ac-btn" disabled={busy} onClick={() => void action(async () => { const revision = await flushedRevision(); await documentMutation(base, "DELETE", { expectedRevision: revision }); router.push(`/projects/${detail.projectId}/documents`); })}>移到回收站</button></div></div></div>}
     {version && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-6" role="dialog" aria-modal="true" aria-labelledby="document-version-title"><div className="ac-card flex max-h-[85vh] w-full max-w-3xl flex-col gap-4 p-6"><div className="flex justify-between gap-3"><h2 id="document-version-title" className="font-semibold">{version.version.label}</h2><button aria-label="关闭版本查看" onClick={() => setVersion(null)}><X size={18} /></button></div><div className="flex flex-wrap gap-2"><select aria-label="比较的文档版本" className="min-w-0 rounded border border-line bg-canvas p-2 text-sm" value={compareId} onChange={(event) => setCompareId(event.target.value)}><option value="">与当前正文比较</option>{detail.versions.filter((item) => item.id !== version.version.id).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(compareVersion)}>查看差异</button><button className="ac-btn-ghost" onClick={() => downloadText(version.markdown, `${safeFilename(detail.title)}-${safeFilename(version.version.label)}.md`)}>导出此版本</button>{canEdit && <button className="ac-btn" disabled={busy} onClick={() => void action(restoreVersion)}>恢复此版本</button>}</div>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<pre className="min-h-0 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-canvas p-4 text-xs leading-relaxed">{comparison || version.markdown || "空文档"}</pre>{comparison && <p className="text-xs text-ink-soft">以 − 开头的行为旧内容，+ 开头的行为新内容。</p>}</div></div>}
+    {taskSource && <DocumentTaskDialog document={detail} source={taskSource} busy={busy} error={error} onClose={() => { if (!busy) setTaskSource(null); }} onSubmit={input => void action(() => submitDocumentTask(input))} />}
   </main>;
 }

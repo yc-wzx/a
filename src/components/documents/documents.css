@@ -33,6 +33,19 @@
 .document-outline { position: sticky; top: 76px; max-height: calc(100vh - 120px); overflow: auto; padding: 24px 10px 24px 16px; color: var(--color-ink-soft); }
 .document-outline button { overflow-wrap: anywhere; }
 .document-outline button[aria-current=location] { color: var(--color-primary); background: var(--color-primary-soft); }
+.document-prose .document-reference { display: inline; border-radius: 4px; padding: 2px 5px; color: var(--color-primary); background: var(--color-primary-soft); font-size: .94em; }
+.document-prose .document-reference a { text-decoration: none; }
+.document-prose .document-reference a:hover { text-decoration: underline; }
+.document-prose aside[data-callout-kind] { margin: 1.2em 0; padding: 14px 18px; border-radius: 9px; border: 1px solid var(--color-line); background: var(--color-primary-soft); }
+.document-prose aside[data-callout-kind]::before { display: block; color: var(--color-primary); font-size: 12px; font-weight: 600; content: "提示"; margin-bottom: 5px; }
+.document-prose aside[data-callout-kind=question]::before { content: "待确认"; }
+.document-prose aside[data-callout-kind=risk] { background: #fff5e8; }
+.document-prose aside[data-callout-kind=risk]::before { content: "风险"; color: #9b6127; }
+.document-prose aside[data-callout-kind] > p { margin: 5px 0; }
+.document-prose details[data-document-toggle] { margin: 1em 0; border-top: 1px solid var(--color-line); padding-top: 10px; }
+.document-prose details[data-document-toggle] > summary { cursor: pointer; font-weight: 500; }
+.document-prose [data-toggle-content] { padding: 4px 0 0 22px; }
+.document-reference-dialog { color: var(--color-ink); }
 .document-body-with-outline .document-prose { padding-left: 24px; padding-right: 28px; }
 .document-selection-menu { z-index: 40; display: flex; align-items: center; gap: 2px; border: 1px solid var(--color-line); border-radius: 10px; padding: 5px; background: var(--color-surface); box-shadow: 0 6px 24px #33271c20; font-size: 12px; }
 .document-selection-menu button { display: flex; align-items: center; gap: 4px; padding: 7px; border-radius: 6px; }

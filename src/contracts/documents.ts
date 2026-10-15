@@ -25,6 +25,8 @@ export type DocumentSummary = {
   updatedAt: string;
   deletedAt: string | null;
   excerpt: string;
+  sourceBlockId?: string | null;
+  bookmarked?: boolean;
 };
 export type DocumentGrant = { userId: string; name: string; permission: DocumentPermission };
 export type DocumentTaskLink = { taskId: string; title: string; status: string; href: string };
@@ -60,8 +62,18 @@ export type DocumentDetail = DocumentSummary & {
   versions: DocumentVersion[];
   actorId: string;
   actorName: string;
+  canCreateTask: boolean;
 };
 export type DocumentList = { items: DocumentSummary[]; total: number; nextOffset: number | null };
+export type DocumentShortcut = { id: string; projectId: string; projectName: string; title: string; folder: string; href: string; at: string };
+export type DocumentPersonal = { favorites: DocumentShortcut[]; recent: DocumentShortcut[] };
+export type DocumentKnowledge = DocumentPersonal & {
+  canManage: boolean;
+  pins: { slot: string; documentId: string; title: string; href: string }[];
+  tasks: DocumentTaskLink[];
+};
+export type DocumentReferenceItem = { id: string; title: string; folder: string; href: string };
+export type DocumentRelations = { outgoing: DocumentReferenceItem[]; incoming: DocumentReferenceItem[] };
 export type DocumentPresence = { sessionId: string; userId: string; name: string; awareness: string | null };
 export type DocumentSyncInput = {
   sessionId: string;
@@ -97,3 +109,9 @@ export type DocumentSyncResult = {
 // GET /:documentId/export -> authenticated .md download
 // POST /:documentId/ai {operation:"polish"|"summarize"|"suggest",selection,epoch,revision}
 // -> {text,operation,epoch,revision}; preview only. Client applies on explicit confirmation.
+// GET /knowledge -> DocumentKnowledge; POST /knowledge {slot,documentId|null,expectedDocumentId|null}
+// GET /personal -> DocumentPersonal (only the actor's bookmarks/visits)
+// GET /:documentId/references -> DocumentRelations (current ACL, no hidden counts)
+// POST /:documentId/bookmark {bookmarked:boolean}; POST /:documentId/visit {}
+// POST /:documentId/create-task {requestId,expectedRevision,epoch,blockId,selection,title,assigneeId?,dueDate?,sharePrivateContent?}
+// POST /ask {question,documents:[{id,revision,epoch}]} -> DocumentAnswer, 1–3 current readable sources, personal model only.

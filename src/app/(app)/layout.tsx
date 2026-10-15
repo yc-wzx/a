@@ -5,6 +5,7 @@ import { NotificationNav } from "@/components/notification-nav";
 import { getMyProfile } from "@/lib/member-profile";
 import { MemberAvatar } from "@/components/people/member-avatar";
 import { TaskDrawerHost } from "@/components/tasks/task-drawer-host";
+import { GlobalWorkspaceSearch } from "@/components/dashboard/global-workspace-search";
 import {
   GettingStartedHint,
   TutorialMenu,
@@ -57,6 +58,7 @@ export default async function AppLayout({
             </Link>
             <NotificationNav actorId={session.user.id} />
             <TutorialMenu />
+            <GlobalWorkspaceSearch />
           </nav>
         </div>
         <details data-tour="account" className="relative shrink-0">

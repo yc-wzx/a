@@ -34,6 +34,7 @@ import {
   type WorkspaceCommand,
 } from "@/components/dashboard/command-menu";
 import "@/components/dashboard/workspace.css";
+import { DashboardPersonalDocuments } from "@/components/dashboard/personal-documents";
 
 function ready<T>(p: QueryPart<T>): T | null {
   return p.state === "ready" ? p.data : null;
@@ -524,6 +525,7 @@ export default async function DashboardPage({
           </section>
         </div>
         <aside className="min-w-0 space-y-5">
+          <DashboardPersonalDocuments actorId={session.user.id} />
           <section className="workspace-panel" data-tour="workspace-schedule">
             <SectionHeading
               title="今日日程"

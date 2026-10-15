@@ -7,12 +7,15 @@ import Collaboration, { isChangeOrigin } from "@tiptap/extension-collaboration";
 import UniqueID from "@tiptap/extension-unique-id";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Bold, Italic, List, ListOrdered, CheckSquare, Quote, Code2, Table2, Link2, ImageIcon, Undo2, Redo2, MessageSquare, ListTree, Sparkles, Copy, X } from "lucide-react";
-import type { DocumentDetail } from "@/contracts/documents";
+import { Bold, Italic, List, ListOrdered, CheckSquare, Quote, Code2, Table2, Link2, ImageIcon, Undo2, Redo2, MessageSquare, ListTree, Sparkles, Copy, X, FileText, Plus } from "lucide-react";
+import type { DocumentDetail, DocumentReferenceItem, DocumentSummary } from "@/contracts/documents";
 import { baseDocumentExtensions } from "./extensions";
 import { DocumentSyncProvider, type SyncSnapshot } from "./sync-provider";
 import { documentOutline, documentBlockHash, readDocumentBlockHash, findSlashRange, matchesCommand, type SlashRange } from "./editor-interactions";
 import { DocumentAnchorHighlight, documentAnchorHighlightKey } from "./anchor-highlight";
+import { InteractiveDocumentReference, InteractiveDocumentToggle } from "./knowledge-extensions";
+import { DocumentReferencePicker } from "./document-reference-picker";
+import { moveDocumentBlock } from "./block-movement";
 import "./documents.css";
 
 export type DocumentEditorHandle = { editor: Editor; provider: DocumentSyncProvider };
@@ -24,6 +27,9 @@ type DocumentEditorProps = {
   onSync: (state: SyncSnapshot) => void;
   onComment: (editor: Editor) => void;
   onAi: () => void;
+  references: DocumentReferenceItem[];
+  canCreateTask: boolean;
+  onCreateTask: (editor: Editor) => void;
 };
 const insertCommands = [
   { label: "一级标题", aliases: ["h1", "heading1", "title1"], action: (current: Editor) => current.chain().focus().setHeading({ level: 1 }).run() },
@@ -37,6 +43,8 @@ const insertCommands = [
   { label: "表格", aliases: ["table"], action: (current: Editor) => current.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
   { label: "代码块", aliases: ["code"], action: (current: Editor) => current.chain().focus().toggleCodeBlock().run() },
   { label: "分隔线", aliases: ["divider", "hr"], action: (current: Editor) => current.chain().focus().setHorizontalRule().run() },
+  { label: "折叠内容", aliases: ["toggle", "fold"], action: (current: Editor) => current.chain().focus().insertContent({ type: "documentToggle", content: [{ type: "toggleSummary", content: [{ type: "text", text: "点击填写折叠标题" }] }, { type: "toggleContent", content: [{ type: "paragraph", content: [{ type: "text", text: "在这里补充详细内容。" }] }] }] }).run() },
+  ...([{ kind: "note", label: "提示块" }, { kind: "question", label: "待确认块" }, { kind: "risk", label: "风险提示块" }] as const).map(item => ({ label: item.label, aliases: ["callout", item.kind], action: (current: Editor) => current.chain().focus().insertContent({ type: "documentCallout", attrs: { kind: item.kind }, content: [{ type: "paragraph", content: [{ type: "text", text: "填写需要强调的内容。" }] }] }).run() })),
 ];
 const selectionMenuOptions = { placement: "top" as const, offset: 8, shift: { padding: 12 } };
 const appendSelectionMenu = () => document.body;
@@ -54,7 +62,7 @@ export default function DocumentEditor(props: DocumentEditorProps) {
   if (!provider) return <p className="p-8 text-sm text-ink-soft">正在准备协作连接…</p>;
   return <DocumentEditorCore key={provider.sessionId} {...props} provider={provider} />;
 }
-function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, onComment, onAi, provider }: DocumentEditorProps & { provider: DocumentSyncProvider }) {
+function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, onComment, onAi, provider, references, canCreateTask, onCreateTask }: DocumentEditorProps & { provider: DocumentSyncProvider }) {
   const [slash, setSlash] = useState<SlashRange | null>(null);
   const [commandIndex, setCommandIndex] = useState(0);
   const [outlineOpen, setOutlineOpen] = useState(true);
@@ -68,24 +76,25 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
   const [urlType, setUrlType] = useState<"image" | "link" | null>(null);
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState("");
+  const [referenceRange, setReferenceRange] = useState<{ from: number; to: number; prefix: string } | null>(null);
   const readyRef = useRef(onReady);
   const syncRef = useRef(onSync);
   const editorRef = useRef<Editor | null>(null);
   // BubbleMenu dispatches a transaction when these options change. Keep them
   // stable across editor transactions to avoid an options/render feedback loop.
   const showSelectionMenu = useCallback(({ editor: current, element, from, to }: { editor: Editor; element: HTMLElement; from: number; to: number }) =>
-    !urlType && (current.isFocused || element.contains(document.activeElement)
-      || (!current.isEditable && canComment && current.view.dom.contains(window.getSelection()?.anchorNode ?? null))) && from !== to
-      && Boolean(current.state.doc.textBetween(from, to).trim()) && (current.isEditable || canComment), [urlType, canComment]);
+    !urlType && !referenceRange && (current.isFocused || element.contains(document.activeElement)
+      || (!current.isEditable && (canComment || canCreateTask) && current.view.dom.contains(window.getSelection()?.anchorNode ?? null))) && from !== to
+      && Boolean(current.state.doc.textBetween(from, to).trim()) && (current.isEditable || canComment || canCreateTask), [urlType, referenceRange, canComment, canCreateTask]);
   useEffect(() => { readyRef.current = onReady; syncRef.current = onSync; }, [onReady, onSync]);
   const editor = useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: true,
-    extensions: [...baseDocumentExtensions(), DocumentAnchorHighlight,
+    extensions: [...baseDocumentExtensions().filter(extension => !["documentReference", "documentToggle"].includes(extension.name)), InteractiveDocumentReference, InteractiveDocumentToggle, DocumentAnchorHighlight,
       Placeholder.configure({ placeholder: "写下项目内容，或输入 / 插入标题、表格、检查项…" }),
       Collaboration.configure({ document: provider.doc, field: "default" }),
       CollaborationCaret.configure({ provider, user: { id: initial.actorId, name: initial.actorName, color: "#b26140" } }),
-      UniqueID.configure({ types: ["paragraph", "heading", "blockquote", "codeBlock", "table", "bulletList", "orderedList", "taskList", "image", "horizontalRule"],
+      UniqueID.configure({ types: ["paragraph", "heading", "blockquote", "codeBlock", "table", "bulletList", "orderedList", "taskList", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary"],
         filterTransaction: (transaction) => !isChangeOrigin(transaction) && provider.getSnapshot().permission === "edit" && !["blocked", "restored"].includes(provider.getSnapshot().status) }),
     ],
     editable,
@@ -93,6 +102,7 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
       handleKeyDown: (_view, event) => keyHandler.current(event) },
     onUpdate: ({ editor: current }) => {
       const { $from } = current.state.selection;
+      if (current.isEditable && $from.parent.type.name !== "codeBlock" && current.state.selection.empty && $from.parent.textBetween(0, $from.parentOffset).endsWith("[[")) setReferenceRange({ from: $from.pos - 2, to: $from.pos, prefix: "[[" });
       const next = findSlashRange($from.parent.textBetween(0, $from.parentOffset), $from.pos, current.state.selection.empty, $from.parent.type.name);
       setSlash(next && JSON.stringify(next) !== dismissedSlash.current ? next : null); setCommandIndex(0);
     },
@@ -105,6 +115,19 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
   useEffect(() => {
     editorRef.current = editor;
   }, [editor]);
+  useEffect(() => {
+    if (!editor) return;
+    const updateReferences = () => {
+      for (const node of editor.view.dom.querySelectorAll<HTMLElement>("[data-document-reference]")) {
+        const target = references.find(item => item.id === node.dataset.documentReference);
+        node.replaceChildren();
+        if (target) { const anchor = document.createElement("a"); anchor.href = target.href; anchor.textContent = target.title; node.append(anchor); }
+        else node.textContent = "引用文档不可用";
+      }
+    };
+    updateReferences(); editor.on("update", updateReferences);
+    return () => { editor.off("update", updateReferences); };
+  }, [editor, references]);
   useEffect(() => {
     provider.awareness.setLocalStateField("sessionId", provider.sessionId);
     const unsubscribe = provider.subscribe((state) => {
@@ -140,6 +163,11 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
   const selectedIndex = Math.min(commandIndex, Math.max(0, filteredCommands.length - 1));
   useEffect(() => {
     keyHandler.current = (event) => {
+      if (editor?.isEditable && !event.isComposing && event.altKey && event.shiftKey && ["ArrowUp", "ArrowDown"].includes(event.key)) {
+        const transaction = moveDocumentBlock(editor.state, event.key === "ArrowUp" ? -1 : 1);
+        if (transaction) editor.view.dispatch(transaction);
+        event.preventDefault(); return true;
+      }
       if (!slash || !editor?.isEditable || event.isComposing || editor.view.composing) return false;
       if (event.key === "Escape") { dismissedSlash.current = JSON.stringify(slash); setSlash(null); return true; }
       if (["ArrowDown", "ArrowUp"].includes(event.key)) {
@@ -154,6 +182,7 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
   const revealBlock = useCallback((id: string) => {
     const block = Array.from(shellRef.current?.querySelectorAll<HTMLElement>("[data-block-id]") ?? []).find(node => node.dataset.blockId === id);
     if (!block) return false;
+    for (let parent = block.parentElement; parent; parent = parent.parentElement) if (parent instanceof HTMLDetailsElement) parent.open = true;
     block.scrollIntoView({ behavior: "smooth", block: "center" });
     // A ProseMirror decoration survives remote updates; a manually added DOM
     // class would disappear when the collaborative editor redraws this block.
@@ -192,6 +221,12 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
       setUrlType(null); setUrl(""); setUrlError("");
     } catch { setUrlError("请输入完整的 HTTP 或 HTTPS 链接。"); }
   }
+  function insertReference(item: DocumentSummary) {
+    if (!editor || !referenceRange || !editor.isEditable) return;
+    if (referenceRange.to > editor.state.doc.content.size || editor.state.doc.textBetween(referenceRange.from, referenceRange.to) !== referenceRange.prefix) { setLinkNotice("插入位置已改变，请重新选择文档引用位置。"); setReferenceRange(null); return; }
+    editor.chain().focus().insertContentAt({ from: referenceRange.from, to: referenceRange.to }, { type: "documentReference", attrs: { documentId: item.id } }).run();
+    setReferenceRange(null);
+  }
   if (!editor) return <p className="p-8 text-sm text-ink-soft">正在准备协作编辑器…</p>;
   const outline = documentOutline(editor.state.doc);
   const caret = slash && editor.isEditable ? editor.view.coordsAtPos(editor.state.selection.from) : null;
@@ -211,6 +246,8 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
       ].map((item) => <button key={item.label} aria-label={item.label} title={item.label} disabled={!editor.isEditable} onMouseDown={(event) => event.preventDefault()} onClick={() => run(item.command)} className={`rounded-md p-2 disabled:opacity-35 ${item.active && editor.isActive(item.active) ? "bg-primary-soft text-primary" : "text-ink-soft hover:bg-primary-soft"}`}><item.icon size={15} /></button>)}
       <button aria-label="插入链接" title="插入链接" disabled={!editor.isEditable} onMouseDown={(event) => event.preventDefault()} onClick={() => { setUrlType("link"); setUrl(editor.getAttributes("link").href || ""); }} className="rounded-md p-2 text-ink-soft hover:bg-primary-soft disabled:opacity-35"><Link2 size={15} /></button>
       <button aria-label="插入图片链接" title="插入图片链接" disabled={!editor.isEditable} onClick={() => { setUrlType("image"); setUrl(""); }} className="rounded-md p-2 text-ink-soft hover:bg-primary-soft disabled:opacity-35"><ImageIcon size={15} /></button>
+      <button aria-label="引用项目文档" title="引用项目文档（或输入 [[）" disabled={!editor.isEditable || editor.isActive("codeBlock")} onMouseDown={event => event.preventDefault()} onClick={() => { const from = editor.state.selection.from; setReferenceRange({ from, to: from, prefix: "" }); }} className="rounded-md p-2 text-ink-soft hover:bg-primary-soft disabled:opacity-35"><FileText size={15} /></button>
+      {([-1, 1] as const).map(direction => <button key={direction} aria-label={direction < 0 ? "内容块上移" : "内容块下移"} title={`${direction < 0 ? "内容块上移" : "内容块下移"}（Alt+Shift+${direction < 0 ? "↑" : "↓"}）`} disabled={!editor.isEditable || !moveDocumentBlock(editor.state, direction)} onMouseDown={event => event.preventDefault()} onClick={() => { const tr = moveDocumentBlock(editor.state, direction); if (tr) { editor.view.dispatch(tr); editor.view.focus(); } }} className="rounded-md px-2 py-1.5 text-xs text-ink-soft hover:bg-primary-soft disabled:opacity-35">{direction < 0 ? "↑ 上移" : "↓ 下移"}</button>)}
       <button className="rounded-md p-2 text-ink-soft hover:bg-primary-soft" aria-label="复制当前段落链接" title="复制当前段落链接" onMouseDown={(event) => event.preventDefault()} onClick={() => void copyBlock()}><Copy size={15} /></button>
       <button className="flex items-center gap-1 rounded-md p-2 text-xs text-ink-soft hover:bg-primary-soft" aria-expanded={outlineOpen} onClick={() => setOutlineOpen(!outlineOpen)}><ListTree size={14} />正文目录</button>
       <button className="ml-auto flex items-center gap-1 rounded-md p-2 text-xs text-primary hover:bg-primary-soft" disabled={!canComment} onMouseDown={(event) => event.preventDefault()} onClick={() => onComment(editor)}><MessageSquare size={14} />评论当前段落</button>
@@ -230,6 +267,7 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
       {canComment && <button onMouseDown={event => event.preventDefault()} onClick={() => onComment(editor)}><MessageSquare size={14} />评论选区</button>}
       <button onMouseDown={event => event.preventDefault()} onClick={() => void copyBlock()}><Copy size={14} />段落链接</button>
       {editor.isEditable && <button onMouseDown={event => event.preventDefault()} onClick={onAi}><Sparkles size={14} />AI 辅助</button>}
+      {canCreateTask && <button onMouseDown={event => event.preventDefault()} onClick={() => onCreateTask(editor)}><Plus size={14} />创建任务</button>}
       </div>
     </BubbleMenu>
     <div className={outlineOpen ? "document-body-with-outline" : ""}>
@@ -240,5 +278,6 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
       }} title={item.title}>{item.title}</button>) : <p className="text-xs leading-relaxed text-ink-faint">插入标题后，目录会自动出现。</p>}</nav>}
       <EditorContent editor={editor} />
     </div>
+    {referenceRange && <DocumentReferencePicker projectId={initial.projectId} documentId={initial.id} query="" onChoose={insertReference} onClose={() => setReferenceRange(null)} />}
   </div>;
 }

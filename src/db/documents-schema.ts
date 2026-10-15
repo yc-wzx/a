@@ -78,3 +78,33 @@ export const documentAiRequests = pgTable("document_ai_requests", {
   documentId: uuid("document_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("document_ai_requests_user_idx").on(t.userId, t.createdAt)]);
+
+export const documentBookmarks = pgTable("document_bookmarks", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.documentId] })]);
+
+export const documentVisits = pgTable("document_visits", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
+  visitedAt: timestamp("visited_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.documentId] }), index("document_visits_user_time_idx").on(t.userId, t.visitedAt)]);
+
+export const documentGuidePins = pgTable("document_guide_pins", {
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  slot: text("slot").notNull(),
+  documentId: uuid("document_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.projectId, t.slot] })]);
+
+export const documentReferences = pgTable("document_references", {
+  sourceId: uuid("source_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
+  targetId: uuid("target_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
+}, t => [primaryKey({ columns: [t.sourceId, t.targetId] }), index("document_references_target_idx").on(t.targetId)]);
+
+export const documentTaskOrigins = pgTable("document_task_origins", {
+  taskId: uuid("task_id").primaryKey().references(() => tasks.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
+  blockId: text("block_id"),
+}, t => [index("document_task_origins_document_idx").on(t.documentId)]);
