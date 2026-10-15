@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-15",
+  "tests": { "passed": 782, "failed": 0, "skipped": 2, "skippedReason": "Real external AI integration requires configured credentials" },
+  "typecheck": "passed",
+  "productionBuild": "passed",
+  "eslint": { "errors": 0, "warnings": 1, "existingWarning": "tests/agent-api.test.ts unused joinTeam import" },
+  "freshDatabaseMigrations": { "count": 20, "last": "0019_notion_document_workflow", "result": "passed" },
+  "desktopBrowserChecks": 11,
+  "uncaughtBrowserErrors": 0
+}
