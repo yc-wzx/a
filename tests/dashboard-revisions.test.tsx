@@ -224,7 +224,9 @@ describe("工作台未读通知", () => {
       await DashboardPage({ searchParams: Promise.resolve({}) }),
     );
     expect(html).toContain("工作台");
-    expect(html).toContain("我的任务");
+    expect(html).toContain("我的工作");
+    expect(html).toContain("任务列表");
+    expect(html).toContain("日历显示方式");
     expect(html).toContain("当前迭代");
     vi.restoreAllMocks();
   });

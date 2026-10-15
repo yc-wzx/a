@@ -263,6 +263,20 @@ function view(row: typeof personalWorkPlans.$inferSelect, stale = false) {
     confirmedAt: row.confirmedAt?.toISOString() ?? null,
   };
 }
+/** Read-only calendar check uses exactly the planner's snapshot rules; no model call. */
+export async function isPersonalPlanStale(
+  tx: DbTx,
+  actorId: string,
+  row: typeof personalWorkPlans.$inferSelect,
+) {
+  try {
+    const current = await context(tx, actorId, row.projectId, row.input as GeneratePlanInput, row.id);
+    return current.hash !== row.snapshotHash;
+  } catch (error) {
+    if (error instanceof ConflictError || error instanceof ValidationError) return true;
+    throw error;
+  }
+}
 async function ownPlan(
   tx: DbTx,
   actorId: string,

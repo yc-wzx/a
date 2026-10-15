@@ -38,9 +38,9 @@ export function QuickstartTour({ label = "开始页面操作指引" }: { label?:
         {
           element: '[data-tour="workspace-tasks"]',
           popover: {
-            title: "任务检索与筛选",
+            title: "任务与日历",
             description:
-              "按截止时间、项目或关键词筛选自己的任务；点击任务进入详情。Ctrl K 可以快速查找入口。",
+              "切换任务列表与日历。日历按周、月或事项查看本人课表、已确认工作安排及项目截止节点；截止日期不占用工作时段。点击任务在当前页面查看详情。",
           },
         },
         {

@@ -35,6 +35,7 @@ import {
 } from "@/components/dashboard/command-menu";
 import "@/components/dashboard/workspace.css";
 import { DashboardPersonalDocuments } from "@/components/dashboard/personal-documents";
+import { WorkspaceCalendarPanel } from "@/components/dashboard/workspace-calendar";
 
 function ready<T>(p: QueryPart<T>): T | null {
   return p.state === "ready" ? p.data : null;
@@ -411,14 +412,7 @@ export default async function DashboardPage({
           <ArrowRight aria-hidden className="size-4" />
         </Link>
       </section>
-      <div className="workspace-columns">
-        <div className="min-w-0 space-y-5">
-          <section
-            id="tasks"
-            className="workspace-panel scroll-mt-24"
-            data-tour="workspace-tasks"
-          >
-            <SectionHeading title="我的任务" count={taskCount} />
+      <WorkspaceCalendarPanel today={today} taskCount={taskCount} taskVersion={JSON.stringify(allTasks ?? [])}>
             <p className="px-5 pb-4 text-xs text-ink-soft">
               按截止时间排列 · 包含指派给你的子任务
             </p>
@@ -427,7 +421,9 @@ export default async function DashboardPage({
             ) : (
               <DashboardTaskList groups={groups!} />
             )}
-          </section>
+      </WorkspaceCalendarPanel>
+      <div className="workspace-columns">
+        <div className="min-w-0 space-y-5">
           <section className="workspace-panel" data-tour="workspace-projects">
             <SectionHeading
               title="我的项目"
@@ -523,9 +519,6 @@ export default async function DashboardPage({
               </p>
             )}
           </section>
-        </div>
-        <aside className="min-w-0 space-y-5">
-          <DashboardPersonalDocuments actorId={session.user.id} />
           <section className="workspace-panel" data-tour="workspace-schedule">
             <SectionHeading
               title="今日日程"
@@ -666,6 +659,9 @@ export default async function DashboardPage({
                 </nav>
               )}
           </section>
+        </div>
+        <aside className="min-w-0 space-y-5">
+          <DashboardPersonalDocuments actorId={session.user.id} />
           <section className="workspace-assistant">
             <span className="workspace-icon-tile">
               <Sparkles aria-hidden className="size-5" />
