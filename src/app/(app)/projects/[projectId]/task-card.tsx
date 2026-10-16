@@ -58,7 +58,7 @@ export function TaskCard({
           {task.title}
         </button>
         <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-soft">
-          <span>{task.assigneeName ?? "未分配"}</span>
+          <span>{task.assignees?.map(m => m.name).join("、") || task.assigneeName || "未分配"}</span>
           {(task.startDate || task.dueDate) && (
             <span>· {task.startDate ?? "…"}→{task.dueDate ?? "…"}</span>
           )}

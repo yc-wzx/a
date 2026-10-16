@@ -44,11 +44,11 @@ export async function MemberWorkloadPanel({
         <div>
           <h2 className="font-medium text-ink">成员工作量</h2>
           <p className="mt-1 text-xs text-ink-soft">
-            本项目实际任务数；主任务、子任务分别计为一条，已完成不计入逾期。数量不代表投入时长或贡献评分。
+            每位成员参与的任务；共同任务会出现在各执行成员名下。项目任务总数不重复计算，数量不代表贡献评分。
           </p>
         </div>
         <span className="ac-badge shrink-0 bg-sunken text-ink-soft">
-          {rows.reduce((sum, r) => sum + r.total, 0)} 个任务
+          {new Set(rows.flatMap(r => r.urgent.map(t => t.id))).size} 条未完成任务
         </span>
       </div>
       <div className="mt-4 space-y-2">

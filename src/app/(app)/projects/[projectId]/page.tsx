@@ -161,6 +161,7 @@ export default async function ProjectPage({
             startDate: t.startDate,
             dueDate: t.dueDate,
             assigneeName: t.assigneeName,
+            assignees: t.assignees,
             assigneeId: t.assigneeId,
             milestoneId: t.milestoneId,
             labels: t.labels,

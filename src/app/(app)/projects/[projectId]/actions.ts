@@ -17,6 +17,7 @@ const createTaskSchema = z.object({
   title: z.string().trim().min(1, "请填写任务标题"),
   description: z.string().trim().optional(),
   assigneeId: z.uuid().optional(),
+  assigneeIds: z.array(z.uuid()).max(30).optional(),
   startDate: z.iso.date("日期格式不正确").optional(),
   dueDate: z.iso.date("日期格式不正确").optional(),
   milestoneId: z.uuid().optional(),
@@ -33,6 +34,7 @@ export async function createTaskAction(
   const raw = Object.fromEntries(formData);
   const parsed = createTaskSchema.safeParse({
     ...raw,
+    assigneeIds: formData.getAll("assigneeIds"),
     assigneeId: raw.assigneeId || undefined,
     startDate: raw.startDate || undefined,
     dueDate: raw.dueDate || undefined,

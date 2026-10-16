@@ -15,6 +15,7 @@ const createSchema = z.strictObject({
   requestId: z.uuid(),
   body: z.string().trim().min(1).max(10000),
   mentionedUserIds: z.array(z.uuid()).max(50),
+  replyToId: z.uuid().nullish(),
 });
 const updateSchema = createSchema.extend({
   expectedRevision: z.number().int().positive(),
@@ -47,6 +48,7 @@ export type CommentItem = {
   authorId: string;
   authorName: string;
   body: string;
+  replyToId?: string | null;
   mentionedUserIds: string[];
   revision: number;
   createdAt: string;
@@ -64,6 +66,7 @@ async function dto(tx: typeof db | DbTx, row: Row): Promise<CommentItem> {
     authorId: row.authorId,
     authorName: user?.name ?? "已删除成员",
     body: row.body,
+    replyToId: row.replyToId,
     mentionedUserIds: row.mentionedUserIds,
     revision: row.revision,
     createdAt: row.createdAt.toISOString(),
@@ -219,6 +222,13 @@ export async function createTaskComment(
     ["admin", "teacher", "student"],
     async (tx) => {
       await requireTask(tx, projectId, taskId);
+      const [project] = await tx.select().from(projects).where(eq(projects.id, projectId));
+      if (project.status === "archived") throw new ForbiddenError("归档项目只可查看");
+      if (data.replyToId) {
+        const [target] = await tx.select().from(taskComments).where(and(eq(taskComments.id, data.replyToId), eq(taskComments.taskId, taskId), isNull(taskComments.deletedAt))).for("share");
+        if (!target) throw new NotFoundError("回复目标不存在");
+        data.mentionedUserIds = [...new Set([...data.mentionedUserIds, target.authorId])];
+      }
       const recipients = await mentions(
         tx,
         actorId,
@@ -232,6 +242,7 @@ export async function createTaskComment(
           taskId,
           authorId: actorId,
           body: data.body,
+          replyToId: data.replyToId,
           mentionedUserIds: recipients,
           notifiedUserIds: recipients,
         })
@@ -260,6 +271,8 @@ export async function updateTaskComment(
     ["admin", "teacher", "student"],
     async (tx, role) => {
       await requireTask(tx, projectId, taskId);
+      const [project] = await tx.select().from(projects).where(eq(projects.id, projectId));
+      if (project.status === "archived") throw new ForbiddenError("项目已归档，仅可查看");
       const [old] = await tx
         .select()
         .from(taskComments)
@@ -320,6 +333,8 @@ export async function deleteTaskComment(
     ["admin", "teacher", "student"],
     async (tx, role) => {
       await requireTask(tx, projectId, taskId);
+      const [project] = await tx.select().from(projects).where(eq(projects.id, projectId));
+      if (project.status === "archived") throw new ForbiddenError("项目已归档，仅可查看");
       const [old] = await tx
         .select()
         .from(taskComments)

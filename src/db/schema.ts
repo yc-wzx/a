@@ -235,6 +235,55 @@ export const tasks = pgTable(
   ],
 );
 
+// One task stays one task; executors and private discussion access are independent.
+export const taskAssignees = pgTable("task_assignees", {
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+}, t => [primaryKey({ columns: [t.taskId, t.userId] }), index("task_assignees_user_idx").on(t.userId)]);
+export const taskDiscussionInvites = pgTable("task_discussion_invites", {
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+}, t => [primaryKey({ columns: [t.taskId, t.userId] })]);
+export const taskDiscussionMessages = pgTable("task_discussion_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  authorId: uuid("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  requestId: uuid("request_id").notNull(),
+  body: text("body").notNull(),
+  replyToId: uuid("reply_to_id"),
+  mentionedUserIds: jsonb("mentioned_user_ids").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex("discussion_request_unique").on(t.authorId, t.requestId), index("discussion_task_idx").on(t.taskId, t.createdAt, t.id)]);
+export const collaborationReactions = pgTable("collaboration_reactions", {
+  messageId: uuid("message_id").notNull(),
+  channel: text("channel").notNull(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+}, t => [primaryKey({ columns: [t.messageId, t.channel, t.userId] })]);
+export const collaborationReads = pgTable("collaboration_reads", {
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  channel: text("channel").notNull(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.taskId, t.channel, t.userId] })]);
+export const assistantMemories = pgTable("assistant_memories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("assistant_memories_user_idx").on(t.userId)]);
+
+export const assistantRequests = pgTable("assistant_requests", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  requestId: uuid("request_id").notNull(),
+  conversationId: uuid("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  requestHash: text("request_hash").notNull(),
+  status: text("status").notNull().default("running"),
+  result: jsonb("result"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.requestId] })]);
+
 export const messageRoleEnum = pgEnum("message_role", [
   "user",
   "assistant",
@@ -879,6 +928,7 @@ export const taskComments = pgTable(
       .references(() => tasks.id, { onDelete: "cascade" }),
     authorId: uuid("author_id").notNull(),
     body: text("body").notNull(),
+    replyToId: uuid("reply_to_id"),
     mentionedUserIds: jsonb("mentioned_user_ids")
       .$type<string[]>()
       .notNull()

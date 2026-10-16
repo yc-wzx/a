@@ -193,10 +193,10 @@ describe("getTaskPanelData", () => {
     const task = await createTask(student.id, project.id, { title: "写调研报告" });
 
     const asStudent = await getTaskPanelData(student.id, project.id, task.id);
-    expect(asStudent.allowedActions).toEqual({ edit: true, delete: true, comment: false });
+    expect(asStudent.allowedActions).toEqual({ edit: true, delete: true, comment: true });
 
     const asTeacher = await getTaskPanelData(teacher.id, project.id, task.id);
-    expect(asTeacher.allowedActions).toEqual({ edit: false, delete: false, comment: false });
+    expect(asTeacher.allowedActions).toEqual({ edit: false, delete: false, comment: true });
   });
 
   it("拿别的项目 id 拼本项目 taskId 取不到", async () => {

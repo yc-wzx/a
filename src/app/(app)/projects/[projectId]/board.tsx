@@ -19,6 +19,7 @@ import { moveTaskAction } from "./actions";
 import { TaskCard, type Option } from "./task-card";
 
 export type BoardTask = {
+  assignees?: { id: string; name: string }[];
   id: string;
   title: string;
   description: string | null;

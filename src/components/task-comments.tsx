@@ -7,6 +7,7 @@ import {
   getTaskCommentsAction,
   updateTaskCommentAction,
 } from "@/app/(app)/projects/[projectId]/tasks/comments/actions";
+import { collaborationAction } from "@/app/(app)/projects/[projectId]/tasks/collaboration-actions";
 import { newRequestId } from "@/lib/request-id";
 type Loaded = Extract<
   Awaited<ReturnType<typeof getTaskCommentsAction>>,
@@ -23,11 +24,13 @@ export function TaskComments({
   const search = useSearchParams(),
     focus = search.get("comment") ?? undefined;
   const focused = useRef<string | undefined>(undefined);
+  const followLatest = useRef(!focus);
   const [data, setData] = useState<Loaded | null>(null),
     [error, setError] = useState("");
   const [body, setBody] = useState(""),
     [mentioned, setMentioned] = useState<string[]>([]),
     [editing, setEditing] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [requestId, setRequestId] = useState(newRequestId),
     [offset, setOffset] = useState(0);
@@ -43,6 +46,9 @@ export function TaskComments({
         if (!active) return;
         if (result.ok) {
           focused.current = focus;
+          if (focus) followLatest.current = false;
+          if (followLatest.current && result.data.page.nextOffset !== null)
+            setOffset(Math.floor((result.data.page.total - 1) / 20) * 20);
           setData(result.data);
           setError("");
         } else setError(result.error);
@@ -74,12 +80,24 @@ export function TaskComments({
       setError("评论加载失败，请重试");
     }
   }
+  useEffect(() => {
+    let active = true, timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      if (!document.hidden) try {
+        const result = await getTaskCommentsAction(projectId, taskId, { offset, limit: 20 });
+        if (active) { if (result.ok) { setData(result.data); setError(""); if (followLatest.current && result.data.page.nextOffset !== null) setOffset(Math.floor((result.data.page.total - 1) / 20) * 20); } else { setData(null); setError(result.error); } }
+      } catch { if (active) setError("评论连接中断，正在重连；输入已保留"); }
+      if (active) timer = setTimeout(poll, 1800);
+    };
+    timer = setTimeout(poll, 1800);
+    return () => { active = false; clearTimeout(timer); };
+  }, [projectId, taskId, offset]);
   return (
     <section
       className="space-y-3 border-t border-line pt-4 [overflow-wrap:anywhere]"
-      aria-label="任务讨论"
+      aria-label="团队评论"
     >
-      <h3 className="font-semibold">任务讨论</h3>
+      <h3 className="font-semibold">团队评论</h3>
       {error && (
         <p role="alert" className="text-sm text-high">
           {error}{" "}
@@ -105,7 +123,9 @@ export function TaskComments({
             })}
             {item.revision > 1 && " · 已编辑"}
           </p>
+          {item.replyToId && <p className="border-l-2 border-line pl-2 text-xs text-ink-faint">回复：{data.page.items.find(m => m.id === item.replyToId)?.body.slice(0, 80) ?? "较早的团队评论"}</p>}
           <p className="whitespace-pre-wrap">{item.body}</p>
+          <div className="flex gap-3 text-xs text-primary"><button type="button" disabled={!data.canWrite} onClick={() => { setReplyTo(item.id); setEditing(null); }}>回复</button><button type="button" disabled={!data.canWrite} onClick={async () => { const enabled = !data.reactions.some(r => r.messageId === item.id && r.userId === data.actorId); const r = await collaborationAction(projectId, taskId, { op: "react", channel: "team", messageId: item.id, enabled }); if (!r.ok) setError(r.error); else await reload(); }}>收到 {data.reactions.filter(r => r.messageId === item.id).length || ""}</button></div>
           {item.mentionedUserIds.length > 0 && (
             <p className="text-xs text-primary">
               提及：
@@ -117,7 +137,7 @@ export function TaskComments({
                 .join("、")}
             </p>
           )}
-          {(item.authorId === data.actorId || data.role === "admin") && (
+          {data.canWrite && (item.authorId === data.actorId || data.role === "admin") && (
             <div className="flex gap-3 text-xs">
               <button
                 type="button"
@@ -170,11 +190,12 @@ export function TaskComments({
             <p className="text-sm text-ink-soft">暂无评论</p>
           )}
           <nav className="flex gap-3 text-sm">
+            {data.page.nextOffset !== null && <button type="button" onClick={() => { followLatest.current = true; setOffset(Math.floor((data.page.total - 1) / 20) * 20); }}>查看最新评论</button>}
             {data.page.offset > 0 && (
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => setOffset(Math.max(0, data.page.offset - 20))}
+                onClick={() => { followLatest.current = false; setOffset(Math.max(0, data.page.offset - 20)); }}
               >
                 上一页
               </button>
@@ -183,7 +204,7 @@ export function TaskComments({
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => setOffset(data.page.nextOffset!)}
+                onClick={() => { followLatest.current = data.page.nextOffset! + 20 >= data.page.total; setOffset(data.page.nextOffset!); }}
               >
                 下一页
               </button>
@@ -191,7 +212,8 @@ export function TaskComments({
             <span>共 {data.page.total} 条</span>
           </nav>
           <form
-            className="space-y-2"
+            hidden={!data.canWrite}
+            className="sticky bottom-0 space-y-2 border-t border-line bg-surface p-3 shadow-sm"
             onSubmit={(e) => {
               e.preventDefault();
               if (pending) return;
@@ -212,6 +234,7 @@ export function TaskComments({
                       )
                     : await createTaskCommentAction(projectId, taskId, {
                         requestId,
+                        replyToId: replyTo,
                         body,
                         mentionedUserIds: mentioned,
                       });
@@ -219,6 +242,7 @@ export function TaskComments({
                     setBody("");
                     setMentioned([]);
                     setEditing(null);
+                    setReplyTo(null);
                     setRequestId(newRequestId());
                     setError("");
                     await reload();
@@ -229,6 +253,7 @@ export function TaskComments({
               });
             }}
           >
+            {replyTo && <p className="text-xs">回复已选评论 <button type="button" onClick={() => setReplyTo(null)}>取消回复</button></p>}
             <label className="block text-sm">
               {editing ? "编辑评论" : "发表评论"}
               <textarea
@@ -242,7 +267,7 @@ export function TaskComments({
                 }}
               />
             </label>
-            <label className="block text-sm">
+            <details><summary className="cursor-pointer text-xs text-ink-faint">@ 提及成员</summary><label className="block text-sm">
               @ 提及成员
               <select
                 aria-label="@ 提及成员"
@@ -264,7 +289,7 @@ export function TaskComments({
                     </option>
                   ))}
               </select>
-            </label>
+            </label></details>
             <div className="flex gap-2">
               <button type="submit" className="ac-btn" disabled={pending}>
                 {pending ? "保存中…" : editing ? "保存评论" : "发布评论"}

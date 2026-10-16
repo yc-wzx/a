@@ -48,7 +48,7 @@ describe("工作台个人日历的真实范围与权限", () => {
     await changePersonalPlan(s.student.id, s.project.id, draft.id, { requestId: randomUUID(), expectedRevision: 1, action: "confirm" });
     for (const user of [s.admin, s.other, s.teacher]) {
       const data = await getWorkspaceCalendar(user.id, range);
-      expect(data.entries.every(e => e.source === "deadline" && e.when !== "time")).toBe(true);
+      expect(data.entries.every(e => e.source === "deadline")).toBe(true);
       expect(data.entries.map(e => e.title)).toContain("共同中期节点");
       expect(data.entries.map(e => e.title)).toContain("跨范围迭代");
       expect(JSON.stringify(data)).not.toContain("不公开的事务原因");

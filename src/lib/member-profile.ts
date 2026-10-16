@@ -1,3 +1,4 @@
+import { assignedTo } from "./task-assignees";
 import { and, asc, desc, eq, inArray, lt, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -95,7 +96,7 @@ export async function getMemberProfile(actorId: string, targetId: string,
   // revoked between the initial intersection lookup and the project query.
   const allowedProject = sql`exists(select 1 from ${teamMembers} a join ${teamMembers} b on b.team_id=a.team_id
     where a.user_id=${actorId} and b.user_id=${targetId} and a.team_id=${projects.teamId})`;
-  const assigned = and(inArray(tasks.projectId, projectIds), eq(tasks.assigneeId, targetId), allowedProject);
+  const assigned = and(inArray(tasks.projectId, projectIds), assignedTo(targetId), allowedProject);
   const overdue = and(ne(tasks.status, "done"), lt(tasks.dueDate, today));
   const taskFilter = filter === "all" ? undefined : filter === "overdue" ? overdue : eq(tasks.status, filter);
   const visibleDeliverable = and(inArray(deliverables.projectId, projectIds), eq(deliverables.authorId, targetId),

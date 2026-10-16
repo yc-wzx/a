@@ -1,3 +1,4 @@
+import { assigneesByTask } from "../task-assignees";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, ne, lte, gte, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -161,9 +162,10 @@ async function context(
   );
   const preferences = preferencesSchema.parse(state[0]?.preferences ?? {}),
     scheduleRevision = state[0]?.revision ?? 0;
+  const executors = await assigneesByTask(all.map(t => t.id), tx);
   const eligible = all.filter(
     (t) =>
-      t.assigneeId === actorId &&
+      (t.assigneeId === actorId || executors.get(t.id)?.some(m => m.id === actorId)) &&
       t.status !== "done" &&
       !t.isBlocked &&
       !all.some((child) => child.parentTaskId === t.id) &&
@@ -176,6 +178,7 @@ async function context(
   const hash = hashRequest({
     project: access.project,
     tasks: all,
+    executors: [...executors],
     stages,
     rounds,
     deps,

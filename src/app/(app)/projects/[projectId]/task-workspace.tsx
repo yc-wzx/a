@@ -169,7 +169,7 @@ export function TaskWorkspace(props: {
                         {STATUS[task.status]}
                       </td>
                       <td className="px-3 py-3">
-                        {task.assigneeName ?? "未指派"}
+                        {task.assignees?.map(m => m.name).join("、") || task.assigneeName || "未指派"}
                       </td>
                       <td className="px-3 py-3">
                         {PRIORITY[task.priority] ?? task.priority}

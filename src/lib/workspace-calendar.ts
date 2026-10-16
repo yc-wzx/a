@@ -1,3 +1,4 @@
+import { assignedTo } from "./task-assignees";
 import { and, asc, eq, gt, gte, inArray, lt, lte, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
@@ -30,7 +31,7 @@ export async function getWorkspaceCalendar(actorId: string, input: { startDate: 
     let truncated = events.length > LIMIT;
     if (!ids.length) return { ...range, entries, truncated };
     const [due, stages, rounds, plans] = await Promise.all([
-      tx.select().from(tasks).where(and(inArray(tasks.projectId, ids), eq(tasks.assigneeId, actorId), ne(tasks.status, "done"), gte(tasks.dueDate, range.startDate), lte(tasks.dueDate, range.endDate))).orderBy(tasks.dueDate, tasks.id).limit(LIMIT + 1),
+      tx.select().from(tasks).where(and(inArray(tasks.projectId, ids), assignedTo(actorId), ne(tasks.status, "done"), gte(tasks.dueDate, range.startDate), lte(tasks.dueDate, range.endDate))).orderBy(tasks.dueDate, tasks.id).limit(LIMIT + 1),
       tx.select().from(milestones).where(and(inArray(milestones.projectId, ids), gte(milestones.targetDate, range.startDate), lte(milestones.targetDate, range.endDate))).orderBy(milestones.targetDate, milestones.id).limit(LIMIT + 1),
       tx.select().from(iterations).where(and(inArray(iterations.projectId, ids), lte(iterations.startDate, range.endDate), gte(iterations.endDate, range.startDate))).orderBy(iterations.startDate, iterations.id).limit(LIMIT + 1),
       tx.select().from(personalWorkPlans).where(and(eq(personalWorkPlans.userId, actorId), eq(personalWorkPlans.status, "confirmed"), inArray(personalWorkPlans.projectId, ids), lte(personalWorkPlans.startDate, range.endDate), gte(personalWorkPlans.endDate, range.startDate))).orderBy(personalWorkPlans.startDate, personalWorkPlans.id).limit(101),
@@ -42,7 +43,7 @@ export async function getWorkspaceCalendar(actorId: string, input: { startDate: 
     for (const p of visible) if (p.endDate && p.endDate >= range.startDate && p.endDate <= range.endDate) entries.push({ id: `project:${p.id}`, when: "date", source: "deadline", kind: "project", date: p.endDate, title: `${p.name} · 项目截止`, href: `/projects/${p.id}` });
     // Resolve saved block references against current tasks; deleted/completed/reassigned
     // tasks must never reappear as somebody's scheduled work from an old snapshot.
-    const currentTasks = await tx.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId }).from(tasks).where(and(inArray(tasks.projectId, ids), eq(tasks.assigneeId, actorId), ne(tasks.status, "done")));
+    const currentTasks = await tx.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId }).from(tasks).where(and(inArray(tasks.projectId, ids), assignedTo(actorId), ne(tasks.status, "done")));
     const ownTasks = new Map(currentTasks.map(t => [t.id, t]));
     for (const p of plans.slice(0, 100)) {
       const stale = await isPersonalPlanStale(tx, actorId, p);

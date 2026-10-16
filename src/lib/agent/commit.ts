@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { createMilestone, createProject, getProjectForUser } from "@/lib/project";
 import { createTask, listProjectTasks, updateTask } from "@/lib/task";
 import { notifyTaskAssigned, notifyTaskCompleted } from "@/lib/notify";
+import { runIdempotent } from "@/lib/write-request";
+import type { DbTx } from "@/db";
 import { ForbiddenError } from "@/lib/errors";
 import type { WriteToolName } from "./tools";
 
@@ -10,6 +12,7 @@ const taskDraftSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   assigneeId: z.string().optional(),
+  assigneeIds: z.array(z.uuid()).max(30).optional(),
   dueDate: z.string().optional(),
   milestoneId: z.string().optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
@@ -28,6 +31,7 @@ const patchSchema = z.object({
   title: z.string().optional(),
   status: z.enum(["todo", "doing", "done"]).optional(),
   assigneeId: z.string().optional(),
+  assigneeIds: z.array(z.uuid()).max(30).optional(),
   dueDate: z.string().optional(),
   milestoneId: z.string().optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
@@ -58,24 +62,27 @@ export async function commitDraft(
   projectId: string,
   tool: WriteToolName,
   draft: unknown,
+  requestId?: string,
 ): Promise<CommitResult> {
   const access = await getProjectForUser(actorId, projectId);
-  if (!access) throw new ForbiddenError();
+  if (!access || access.role === "teacher" || access.project.status === "archived") throw new ForbiddenError();
+  const once = <T>(tx: DbTx, payload: unknown, run: () => Promise<T>) => requestId
+    ? runIdempotent(tx, { projectId, actorId, operation: `ai.commit.${tool}`, requestId }, payload, run) : run();
 
   switch (tool) {
     case "create_project": {
       const d = createProjectSchema.parse(draft);
-      await createProject(actorId, access.project.teamId, d);
+      await createProject(actorId, access.project.teamId, { ...d, requestId });
       return { committed: 1, conflicts: [] };
     }
     case "decompose_tasks": {
       const d = decomposeSchema.parse(draft);
       // 批量落库裹事务：中途任一项抛错则整批回滚，杜绝半落库后重试致重复
-      const created = await db.transaction(async (tx) => {
+      const created = await db.transaction(tx => once(tx, d, async () => {
         const out: Awaited<ReturnType<typeof createTask>>[] = [];
         for (const t of d.tasks) out.push(await createTask(actorId, projectId, t, { tx }));
         return out;
-      });
+      }));
       // 事务提交后补发通知（tx 路径 createTask 不 fire，由此处统一发）
       for (const t of created) if (t.assigneeId) void notifyTaskAssigned(t);
       return { committed: d.tasks.length, conflicts: [] };
@@ -94,11 +101,11 @@ export async function commitDraft(
         }
         return true;
       });
-      const updatedRows = await db.transaction(async (tx) => {
+      const updatedRows = await db.transaction(tx => once(tx, d, async () => {
         const out: Awaited<ReturnType<typeof updateTask>>[] = [];
         for (const u of toApply) out.push(await updateTask(actorId, u.taskId, u.patch, { tx }));
         return out;
-      });
+      }));
       // 事务提交后补发完成通知：状态由非 done 转 done 者，知会创建者
       for (const t of updatedRows) {
         if (t.status === "done" && prevStatus.get(t.id) !== "done")
@@ -117,7 +124,8 @@ export async function commitDraft(
     case "create_milestone": {
       const d = createMilestoneSchema.parse(draft);
       // createMilestone 内部以 role === "admin" 收口，非管理员在此被拒
-      await createMilestone(actorId, projectId, d);
+      if (access.role !== "admin") throw new ForbiddenError();
+      await db.transaction(tx => once(tx, d, () => createMilestone(actorId, projectId, d, { tx })));
       return { committed: 1, conflicts: [] };
     }
   }

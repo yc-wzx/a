@@ -1,3 +1,4 @@
+import { assigneesByTask, assignedTo } from "./task-assignees";
 import {
   and,
   asc,
@@ -81,6 +82,7 @@ export const SUMMARY_COLS = {
   >`coalesce(${tasks.sprintId}, (select p.sprint_id from tasks p where p.id = ${tasks.parentTaskId} and p.project_id = ${tasks.projectId}))`,
   assigneeId: tasks.assigneeId,
   assigneeName: users.name,
+  assignees: sql<{ id: string; name: string }[]>`coalesce((select jsonb_agg(jsonb_build_object('id',u.id,'name',u.name) order by u.name,u.id) from task_assignees ta join users u on u.id=ta.user_id where ta.task_id=${tasks.id}), '[]'::jsonb)`,
   completionNote: tasks.completionNote,
   isBlocked: tasks.isBlocked,
   blockedReason: tasks.blockedReason,
@@ -90,6 +92,7 @@ export const SUMMARY_COLS = {
 
 /** SUMMARY_COLS 的取数结果。手写而非推导，靠 listBacklog 等调用点让编译器校验收敛。 */
 export type TaskRow = {
+  assignees?: { id: string; name: string }[];
   id: string;
   projectId: string;
   title: string;
@@ -120,6 +123,7 @@ export type TaskRow = {
  */
 export function toTaskSummary(row: TaskRow): TaskSummary {
   return {
+    ...(row.assignees && { assignees: row.assignees }),
     id: row.id,
     projectId: row.projectId,
     title: row.title,
@@ -168,7 +172,7 @@ export async function listBacklog(
   const { offset, limit } = normalizePage(filters);
   const where = and(
     backlogWhere(projectId),
-    filters.assigneeId ? eq(tasks.assigneeId, filters.assigneeId) : undefined,
+    filters.assigneeId ? assignedTo(filters.assigneeId) : undefined,
     filters.priority ? eq(tasks.priority, filters.priority) : undefined,
   );
 
@@ -187,8 +191,9 @@ export async function listBacklog(
     .from(tasks)
     .where(where);
 
+  const people = await assigneesByTask(rows.map(r => r.id));
   return pageResult(
-    rows.map(toTaskSummary),
+    rows.map(row => ({ ...toTaskSummary(row), assignees: people.get(row.id) ?? [] })),
     counted?.total ?? 0,
     offset,
     limit,
@@ -234,12 +239,11 @@ export async function getTaskPanelData(
   const allowedActions: TaskAllowedActions = {
     edit: canWrite,
     delete: canWrite,
-    // 评论由 E 交付。P0 没有可用的评论入口，如实为 false，别假装能评。
-    comment: false,
+    comment: access.project.status !== "archived",
   };
 
   return {
-    task: toTaskSummary(row),
+    task: { ...toTaskSummary(row), assignees: (await assigneesByTask([taskId])).get(taskId) ?? [] },
     labels: labelMap.get(taskId) ?? ([] as TaskLabel[]),
     dependencies,
     subtaskProgress: progress,
@@ -269,7 +273,7 @@ async function summaryById(
     .leftJoin(users, eq(tasks.assigneeId, users.id))
     .where(and(eq(tasks.id, taskId), eq(tasks.projectId, projectId)));
   if (!row) throw new NotFoundError("任务不存在");
-  return toTaskSummary(row);
+  return { ...toTaskSummary(row), assignees: (await assigneesByTask([taskId], exec)).get(taskId) ?? [] };
 }
 
 function taskKey(
@@ -300,6 +304,7 @@ export async function createTaskV1(
             description: input.description ?? undefined,
             acceptanceCriteria: input.acceptanceCriteria ?? undefined,
             assigneeId: input.assigneeId ?? undefined,
+            assigneeIds: input.assigneeIds,
             startDate: input.startDate ?? undefined,
             dueDate: input.dueDate ?? undefined,
             milestoneId: input.milestoneId ?? undefined,

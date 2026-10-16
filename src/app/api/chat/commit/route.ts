@@ -7,6 +7,7 @@ import { AppError, ForbiddenError } from "@/lib/errors";
 
 const schema = z.object({
   projectId: z.uuid(),
+  requestId: z.uuid().optional(),
   tool: z.enum(WRITE_TOOL_NAMES),
   draft: z.unknown(),
 });
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
       parsed.data.projectId,
       parsed.data.tool,
       parsed.data.draft,
+      parsed.data.requestId,
     );
     return NextResponse.json(result);
   } catch (e) {

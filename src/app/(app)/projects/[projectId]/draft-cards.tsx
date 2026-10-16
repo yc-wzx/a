@@ -1,16 +1,17 @@
 "use client";
 
+import { newRequestId } from "@/lib/request-id";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export type Draft = { tool: string; draft: unknown };
+export type Draft = { tool: string; draft: unknown; requestId?: string };
 type Option = { id: string; name: string };
 
-async function commit(projectId: string, tool: string, draft: unknown): Promise<string | null> {
+async function commitRemote(projectId: string, tool: string, draft: unknown, requestId: string): Promise<string | null> {
   const res = await fetch("/api/chat/commit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ projectId, tool, draft }),
+    body: JSON.stringify({ projectId, tool, draft, requestId }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) return data.error ?? "落库失败";
@@ -98,6 +99,8 @@ function DraftCard({
   milestones: Option[];
 }) {
   const [data, setData] = useState<Record<string, unknown>>(draft.draft as Record<string, unknown>);
+  const [requestId] = useState(() => draft.requestId ?? newRequestId());
+  const commit = (pid: string, tool: string, value: unknown) => commitRemote(pid, tool, value, requestId);
 
   if (draft.tool === "create_project") {
     const d = data as { name?: string; description?: string; startDate?: string; endDate?: string };

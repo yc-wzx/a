@@ -26,8 +26,9 @@ export async function persistTurn(
   userText: string,
   assistantText: string,
   toolTrace: ToolTraceEntry[],
+  exec: typeof db | import("@/db").DbTx = db,
 ) {
-  await db.insert(messages).values([
+  await exec.insert(messages).values([
     { conversationId, role: "user", content: userText },
     {
       conversationId,
