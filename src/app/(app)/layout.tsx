@@ -57,6 +57,7 @@ export default async function AppLayout({
               团队
             </Link>
             <NotificationNav actorId={session.user.id} />
+            <Link href="/assistant" className="whitespace-nowrap rounded-field px-2.5 py-1.5 text-sm text-ink-soft hover:bg-primary-soft hover:text-primary">我的助手</Link>
             <TutorialMenu />
             <GlobalWorkspaceSearch />
           </nav>

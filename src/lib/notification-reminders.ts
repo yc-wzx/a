@@ -2,6 +2,7 @@ import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks, projects, teamMembers } from "@/db/schema";
 import { recordNotificationIntent } from "./notification";
+import { assigneesByTask } from "./task-assignees";
 import { ValidationError } from "./errors";
 const SYSTEM_ACTOR = "00000000-0000-4000-8000-000000000001";
 export async function scanAndRecordDueReminders(now = new Date()) {
@@ -57,7 +58,7 @@ export async function scanAndRecordDueReminders(now = new Date()) {
           projectId: task.projectId,
           actorId: SYSTEM_ACTOR,
           type,
-          recipientIds: [task.assigneeId!],
+          recipientIds: [...new Set([task.assigneeId!, ...((await assigneesByTask([task.id], tx)).get(task.id) ?? []).map(m => m.id)])],
           summary:
             `任务《${task.title}》${type === "task.overdue" ? "已逾期" : "即将到期"}（截止 ${task.dueDate}）`.slice(
               0,

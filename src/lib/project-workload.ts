@@ -3,6 +3,7 @@ export type WorkloadTask = {
   title: string;
   assigneeId: string | null;
   assigneeName: string | null;
+  assignees?: { id: string; name: string }[];
   status: string;
   priority: string;
   dueDate: string | null;
@@ -30,11 +31,13 @@ export function summarizeMemberWorkload(
     ]),
   );
   for (const task of tasks) {
-    const id = task.assigneeId ?? "none";
+    const people = task.assignees?.length ? task.assignees : [{ id: task.assigneeId ?? "none", name: task.assigneeId ? (task.assigneeName ?? "原成员") : "未指派" }];
+    for (const person of people) {
+    const id = person.id;
     if (!rows.has(id))
       rows.set(id, {
         id,
-        name: task.assigneeId ? (task.assigneeName ?? "原成员") : "未指派",
+        name: person.name,
         total: 0,
         open: 0,
         done: 0,
@@ -49,6 +52,7 @@ export function summarizeMemberWorkload(
       if (task.dueDate && task.dueDate < today) row.overdue++;
       row.urgent.push(task);
     }
+  }
   }
   for (const row of rows.values())
     row.urgent.sort((a, b) => {

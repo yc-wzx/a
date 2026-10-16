@@ -11,6 +11,7 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/db/schema";
+import { assigneesByTask, replaceTaskAssignees } from "./task-assignees";
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { getTeamMembership } from "./team";
 import { getProjectForUser } from "./project";
@@ -31,6 +32,7 @@ async function requireProjectAccess(actorId: string, projectId: string) {
 export async function requireTaskWrite(actorId: string, projectId: string) {
   const access = await requireProjectAccess(actorId, projectId);
   if (!TASK_WRITE_ROLES.includes(access.role)) throw new ForbiddenError();
+  if (access.project.status === "archived") throw new ForbiddenError("项目已归档，仅可查看");
   return access;
 }
 
@@ -62,6 +64,7 @@ export async function createTask(
   input: {
     title: string;
     description?: string;
+    assigneeIds?: string[];
     assigneeId?: string;
     startDate?: string;
     dueDate?: string;
@@ -93,7 +96,7 @@ export async function createTask(
       title: input.title,
       description: input.description,
       acceptanceCriteria: input.acceptanceCriteria,
-      assigneeId: input.assigneeId,
+      assigneeId: input.assigneeIds ? (input.assigneeIds[0] ?? null) : input.assigneeId,
       startDate: input.startDate,
       dueDate: input.dueDate,
       milestoneId: input.milestoneId,
@@ -103,6 +106,7 @@ export async function createTask(
     })
     .returning();
 
+  await replaceTaskAssignees(exec, actorId, task, input.assigneeIds ?? (input.assigneeId ? [input.assigneeId] : []));
   await recordTaskMutation(exec, actorId, null, task);
   return task;
 }
@@ -114,6 +118,7 @@ export async function updateTask(
     title?: string;
     description?: string | null;
     acceptanceCriteria?: string | null;
+    assigneeIds?: string[];
     assigneeId?: string | null;
     startDate?: string | null;
     dueDate?: string | null;
@@ -169,7 +174,7 @@ export async function updateTask(
       ...(patch.acceptanceCriteria !== undefined && {
         acceptanceCriteria: patch.acceptanceCriteria,
       }),
-      ...(patch.assigneeId !== undefined && { assigneeId: patch.assigneeId }),
+      ...(patch.assigneeIds !== undefined ? { assigneeId: patch.assigneeIds[0] ?? null } : patch.assigneeId !== undefined ? { assigneeId: patch.assigneeId } : {}),
       ...(patch.startDate !== undefined && { startDate: patch.startDate }),
       ...(patch.dueDate !== undefined && { dueDate: patch.dueDate }),
       ...(patch.milestoneId !== undefined && { milestoneId: patch.milestoneId }),
@@ -182,6 +187,8 @@ export async function updateTask(
     .returning();
   if (!updated) throw new NotFoundError("任务不存在");
 
+  if (patch.assigneeIds !== undefined || patch.assigneeId !== undefined)
+    await replaceTaskAssignees(exec, actorId, updated, patch.assigneeIds ?? (patch.assigneeId ? [patch.assigneeId] : []));
   await recordTaskMutation(exec, actorId, task, updated);
   return updated;
 }
@@ -250,7 +257,8 @@ export async function listProjectTasks(actorId: string, projectId: string) {
     .orderBy(tasks.sortOrder, tasks.id);
 
   const byTask = await labelsByTask(rows.map((r) => r.id));
-  return rows.map((r) => ({ ...r, labels: byTask.get(r.id) ?? [] }));
+  const people = await assigneesByTask(rows.map(r => r.id));
+  return rows.map((r) => ({ ...r, assignees: people.get(r.id) ?? [], labels: byTask.get(r.id) ?? [] }));
 }
 
 // 列某任务之下的子任务（直接子级，不递归）
@@ -292,6 +300,7 @@ export async function createSubtask(
   input: {
     title: string;
     description?: string;
+    assigneeIds?: string[];
     assigneeId?: string;
     startDate?: string;
     dueDate?: string;
@@ -336,7 +345,7 @@ export async function getTaskDetail(actorId: string, taskId: string) {
   if (!row) throw new AppError("任务不存在");
   await requireProjectAccess(actorId, row.projectId);
   const byTask = await labelsByTask([row.id]);
-  return { ...row, labels: byTask.get(row.id) ?? [] };
+  return { ...row, assignees: (await assigneesByTask([row.id])).get(row.id) ?? [], labels: byTask.get(row.id) ?? [] };
 }
 
 // 设置 predecessor 的后置任务（先删旧再插新）。简单关联：仅防直接成环，不强制阻断执行。

@@ -1,5 +1,6 @@
 "use client";
 
+import { MemberPicker } from "@/components/tasks/member-picker";
 import { useActionState } from "react";
 import { createTaskAction, type FormState } from "./actions";
 
@@ -24,14 +25,7 @@ export function NewTaskForm({
       <input name="title" placeholder="任务标题" className="ac-field" />
       <textarea name="description" placeholder="任务描述（可选）" rows={2} className="ac-field" />
       <div className="flex flex-wrap gap-2">
-        <select name="assigneeId" defaultValue="" className="ac-field w-auto text-sm">
-          <option value="">未分配</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        <MemberPicker members={members} />
         <select name="milestoneId" defaultValue="" className="ac-field w-auto text-sm">
           <option value="">无里程碑</option>
           {milestones.map((m) => (

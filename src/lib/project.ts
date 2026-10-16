@@ -193,10 +193,11 @@ export async function createMilestone(
   actorId: string,
   projectId: string,
   input: { title: string; targetDate?: string },
+  opts?: { tx: import("@/db").DbTx },
 ) {
   const access = await getProjectForUser(actorId, projectId);
   if (!access || access.role !== "admin") throw new ForbiddenError();
-  const [milestone] = await db
+  const [milestone] = await (opts?.tx ?? db)
     .insert(milestones)
     .values({ projectId, title: input.title, targetDate: input.targetDate })
     .returning();

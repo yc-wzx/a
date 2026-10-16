@@ -15,7 +15,9 @@ import {
 } from "@/app/(app)/projects/[projectId]/tasks/actions";
 import type { TaskSummary } from "@/contracts/p0-p2";
 import { newRequestId } from "@/lib/request-id";
-import { TaskComments } from "@/components/task-comments";
+import { TaskCollaboration } from "./task-collaboration";
+import { TaskOutcome } from "./task-outcome";
+import { MemberPicker } from "./member-picker";
 import { TaskEnhancementSection } from "./task-enhancements";
 import { TaskDocumentLinks } from "@/components/documents/task-document-links";
 
@@ -144,6 +146,19 @@ export function TaskDetailPanel({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [tab, setTab] = useState<"content" | "outcome">("content");
+  const [split, setSplit] = useState(55);
+  const splitRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const value = Number(localStorage.getItem("agilecampus-task-split"));
+    // Restore a presentation preference only; no business data is stored here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (value >= 38 && value <= 68) setSplit(value);
+  }, []);
+  const changeSplit = (value: number) => {
+    const next = Math.round(Math.min(68, Math.max(38, value)));
+    setSplit(next); localStorage.setItem("agilecampus-task-split", String(next));
+  };
 
   // Modal keyboard focus stays in the drawer; closing restores its original entry.
   useEffect(() => {
@@ -196,7 +211,7 @@ export function TaskDetailPanel({
         description: textOrNull(form, "description"),
         acceptanceCriteria: textOrNull(form, "acceptanceCriteria"),
         completionNote: textOrNull(form, "completionNote"),
-        assigneeId: textOrNull(form, "assigneeId"),
+        assigneeIds: form.getAll("assigneeIds").map(String),
         milestoneId: textOrNull(form, "milestoneId"),
         status: form.get("status") as TaskStatusValue,
         priority: form.get("priority") as TaskPriorityValue,
@@ -249,309 +264,52 @@ export function TaskDetailPanel({
   }
 
   return (
-    <div
-      ref={dialogRef}
-      tabIndex={-1}
-      className="fixed inset-0 z-50 flex justify-end"
-      role="dialog"
-      aria-modal="true"
-      aria-label="任务详情"
-    >
-      <button
-        type="button"
-        aria-label="关闭"
-        tabIndex={-1}
-        onClick={onClose}
-        className="fixed inset-0 cursor-default bg-ink/40 backdrop-blur-sm"
-      />
-      <aside className="relative z-10 flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-line bg-surface p-5 shadow-pop">
-        <header className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs text-ink-faint">任务详情</p>
-            <h3 className="break-words font-display text-base font-semibold text-ink">
-              {task?.title ?? "任务"}
-            </h3>
-          </div>
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={onClose}
-            aria-label="关闭"
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-field text-ink-faint hover:bg-sunken hover:text-ink"
-          >
-            ✕
-          </button>
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="任务详情">
+      <button type="button" aria-label="点击遮罩关闭任务" tabIndex={-1} onClick={onClose} className="fixed inset-0 cursor-default bg-ink/40 backdrop-blur-sm" />
+      <div className="relative z-10 flex h-[min(880px,92vh)] w-[min(1200px,96vw)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-pop">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-6 py-4">
+          <div className="min-w-0"><p className="text-xs text-ink-faint">任务协作</p><h3 className="truncate font-display text-lg font-semibold text-ink">{task?.title ?? "加载任务…"}</h3></div>
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="关闭" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-faint hover:bg-sunken">✕</button>
         </header>
-
-        {state.error && (
-          <div className="space-y-2">
-            <p role="alert" className="text-sm text-high">{state.error}</p>
-            <button
-              type="button"
-              onClick={refetch}
-              className="ac-btn-ghost text-sm"
-            >
-              重试
-            </button>
-          </div>
-        )}
-
-        {!state.error && !state.data && (
-          <p className="text-sm text-ink-faint">载入任务详情…</p>
-        )}
-
-        {task && local && (
-          <div className="space-y-5">
-            <TaskEnhancementSection key={`enhancements-${taskId}`} projectId={projectId} taskId={taskId} onSaved={onSaved} />
-            <TaskDocumentLinks key={`docs-${taskId}`} projectId={projectId} taskId={taskId} />
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-              <Meta label="状态" value={STATUS_LABEL[task.status]} />
-              <Meta label="优先级" value={task.priority} />
-              <Meta label="负责人" value={task.assigneeName ?? "未分配"} />
-              <Meta
-                label="所属迭代"
-                value={task.iterationId ? "已入轮" : "未入轮"}
-              />
-              <Meta label="起始日" value={task.startDate ?? "—"} />
-              <Meta label="截止日" value={task.dueDate ?? "—"} />
-            </dl>
-
-            {local.labels.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1">
-                {local.labels.map((l) => (
-                  <span
-                    key={l.id}
-                    className="ac-badge bg-surface text-ink-soft"
-                  >
-                    {l.name}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <p className="text-xs text-ink-faint">
-              子任务 {local.subtaskProgress.doneCount}/
-              {local.subtaskProgress.total}
-              {local.subtaskProgress.ratio !== null &&
-                ` · ${Math.round(local.subtaskProgress.ratio * 100)}%`}
-              {" · "}依赖 {local.dependencies.length} 条
-            </p>
-
-            {canWrite && local.allowedActions.edit ? (
-              <form
-                // 服务端每次回来的 updatedAt 都不同：用它当 key，冲突刷新后表单会重挂载，
-                // 输入框回到最新值，而不是留着用户手里那份过期内容。
-                key={`fields-${task.updatedAt}`}
-                onSubmit={handleSave}
-                className="space-y-2.5 border-t border-line pt-4"
-              >
-                <Field label="标题">
-                  <input
-                    name="title"
-                    defaultValue={task.title}
-                    required
-                    className="ac-field text-sm"
-                  />
-                </Field>
-                <Field label="描述">
-                  <textarea
-                    name="description"
-                    defaultValue={task.description ?? ""}
-                    rows={2}
-                    className="ac-field text-sm"
-                    placeholder="任务描述"
-                  />
-                </Field>
-                <Field label="验收标准">
-                  <textarea
-                    name="acceptanceCriteria"
-                    defaultValue={task.acceptanceCriteria ?? ""}
-                    rows={3}
-                    className="ac-field text-sm"
-                    placeholder="做到什么程度算完成"
-                  />
-                </Field>
-                <Field label="完成情况（完成时填写）">
-                  <textarea
-                    name="completionNote"
-                    defaultValue={task.completionNote ?? ""}
-                    rows={2}
-                    className="ac-field text-sm"
-                    placeholder="完成说明"
-                  />
-                </Field>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <Field label="状态">
-                    <select
-                      name="status"
-                      defaultValue={task.status}
-                      className="ac-field text-sm"
-                    >
-                      <option value="todo">待办</option>
-                      <option value="doing">进行中</option>
-                      <option value="done">已完成</option>
-                    </select>
-                  </Field>
-                  <Field label="优先级">
-                    <select
-                      name="priority"
-                      defaultValue={task.priority}
-                      className="ac-field text-sm"
-                    >
-                      <option value="low">低</option>
-                      <option value="medium">中</option>
-                      <option value="high">高</option>
-                    </select>
-                  </Field>
-                  <Field label="负责人">
-                    <select
-                      name="assigneeId"
-                      defaultValue={task.assigneeId ?? ""}
-                      className="ac-field text-sm"
-                    >
-                      <option value="">未分配</option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="里程碑">
-                    <select
-                      name="milestoneId"
-                      defaultValue={task.milestoneId ?? ""}
-                      className="ac-field text-sm"
-                    >
-                      <option value="">无里程碑</option>
-                      {milestones.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="起始日">
-                    <input
-                      type="date"
-                      name="startDate"
-                      defaultValue={task.startDate ?? ""}
-                      className="ac-field text-sm"
-                    />
-                  </Field>
-                  <Field label="截止日">
-                    <input
-                      type="date"
-                      name="dueDate"
-                      defaultValue={task.dueDate ?? ""}
-                      className="ac-field text-sm"
-                    />
-                  </Field>
-                </div>
-
+        {state.error && <div className="p-6"><p role="alert" className="text-sm text-high">{state.error}</p><button onClick={refetch} className="ac-btn-ghost">重试</button></div>}
+        {!state.error && !state.data && <p className="p-6 text-sm text-ink-faint">载入任务详情…</p>}
+        {task && local && <div ref={splitRef} className="flex min-h-0 flex-1">
+          <main className="min-w-0 overflow-y-auto p-6" style={{ width: `${split}%` }}>
+            <nav className="mb-5 flex gap-2" aria-label="任务内容切换"><button className={tab === "content" ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab("content")}>任务内容</button><button className={tab === "outcome" ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab("outcome")}>提交成果</button></nav>
+            <div hidden={tab !== "outcome"}><TaskOutcome key={taskId} projectId={projectId} taskId={taskId} title={task.title} canWrite={canWrite && local.allowedActions.edit} onSaved={handleLabelDependencySaved} /></div>
+            <div hidden={tab !== "content"} className="space-y-5">
+              {canWrite && local.allowedActions.edit ? <form key={`fields-${task.updatedAt}`} onSubmit={handleSave} className="space-y-4">
+                <Field label="标题"><input name="title" defaultValue={task.title} required maxLength={200} className="ac-field text-sm" /></Field>
+                <div className="grid grid-cols-2 gap-3"><Field label="状态"><select name="status" defaultValue={task.status} className="ac-field text-sm"><option value="todo">待办</option><option value="doing">进行中</option><option value="done">已完成</option></select></Field><Field label="截止日"><input type="date" name="dueDate" defaultValue={task.dueDate ?? ""} className="ac-field text-sm" /></Field></div>
+                <MemberPicker members={members} selected={task.assignees?.map(m => m.id) ?? (task.assigneeId ? [task.assigneeId] : [])} />
+                <Field label="任务描述"><textarea name="description" defaultValue={task.description ?? ""} rows={3} className="ac-field text-sm" placeholder="说明需要完成的工作" /></Field>
+                <details className="rounded-xl border border-line p-3"><summary className="cursor-pointer text-sm text-ink-soft">更多设置 · 阶段、优先级与完成记录</summary><div className="mt-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-3"><Field label="优先级"><select name="priority" defaultValue={task.priority} className="ac-field text-sm"><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></Field><Field label="起始日"><input type="date" name="startDate" defaultValue={task.startDate ?? ""} className="ac-field text-sm" /></Field></div>
+                  <Field label="里程碑"><select name="milestoneId" defaultValue={task.milestoneId ?? ""} className="ac-field text-sm"><option value="">无里程碑</option>{milestones.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+                  <Field label="验收标准"><textarea name="acceptanceCriteria" defaultValue={task.acceptanceCriteria ?? ""} rows={2} className="ac-field text-sm" /></Field><Field label="完成记录"><textarea name="completionNote" defaultValue={task.completionNote ?? ""} rows={2} className="ac-field text-sm" /></Field>
+                </div></details>
                 {saveError && <p role="alert" className="text-sm text-high">{saveError}</p>}
-
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="ac-btn-ghost"
-                  >
-                    关闭
-                  </button>
-                  <button disabled={saving} className="ac-btn">
-                    {saving ? "保存中…" : "保存"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-2 border-t border-line pt-4 text-sm">
-                <p className="whitespace-pre-wrap text-ink-soft">
-                  {task.description ?? "（无描述）"}
-                </p>
-                {task.acceptanceCriteria && (
-                  <p className="text-xs text-ink-soft">
-                    验收标准：{task.acceptanceCriteria}
-                  </p>
-                )}
-                {!canWrite && (
-                  <p className="text-xs text-ink-faint">
-                    你的角色只能查看任务。
-                  </p>
-                )}
-              </div>
-            )}
-
-            {canWrite && local.allowedActions.edit && (
-              <BlockControl
-                projectId={projectId}
-                taskId={task.id}
-                task={task}
-                onUpdated={(next) =>
-                  setLocal((current) =>
-                    current ? { ...current, task: next } : current,
-                  )
-                }
-                onReload={() => {
-                  refetch();
-                  // 阻塞状态看板卡片上要看得到，所以顺带请父级刷新
-                  onSaved?.();
-                }}
-              />
-            )}
-
-            {feedback.length > 0 && (
-              <div className="space-y-2 border-t border-line pt-4">
-                <p className="text-xs font-medium text-ink-soft">来源反馈</p>
-                {feedback.map((f) => (
-                  <div key={f.id} className="rounded-field bg-sunken p-2.5">
-                    <p className="text-xs text-ink-faint">
-                      {f.milestoneTitle ?? "成果反馈"} ·{" "}
-                      {f.decision === "changes_requested" ? "退回修改" : "通过"}{" "}
-                      · {f.createdAt.slice(0, 10)}
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-soft">
-                      {f.comment}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {canWrite && local.allowedActions.edit && (
-              <LabelDependencyForm
-                key={`associations-${task.updatedAt}`}
-                projectId={projectId}
-                taskId={task.id}
-                expectedUpdatedAt={task.updatedAt}
-                currentLabelIds={local.labels.map((l) => l.id)}
-                currentSuccessorIds={local.dependencies
-                  .filter((d) => d.predecessorId === task.id)
-                  .map((d) => d.successorId)}
-                allLabels={allLabels}
-                allTasks={allTasks}
-                onSaved={handleLabelDependencySaved}
-              />
-            )}
-
-            <TaskComments key={`comments-${taskId}`} projectId={projectId} taskId={taskId} />
-
-            {canWrite && local.allowedActions.delete && (
-              <div className="border-t border-line pt-3">
-                <button
-                  type="button"
-                  disabled={deleting}
-                  onClick={() => void handleDelete()}
-                  className="text-xs text-high underline disabled:opacity-50"
-                >
-                  {deleting ? "删除中…" : "删除任务"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </aside>
+                <div className="flex justify-end"><button disabled={saving} className="ac-btn">{saving ? "保存中…" : "保存任务"}</button></div>
+              </form> : <div className="space-y-3 text-sm"><p>{STATUS_LABEL[task.status]} · 截止 {task.dueDate ?? "未设置"}</p><p>执行成员：{task.assignees?.map(m => m.name).join("、") || task.assigneeName || "未分配"}</p><p className="whitespace-pre-wrap text-ink-soft">{task.description || "暂无描述"}</p>{task.acceptanceCriteria && <p>验收标准：{task.acceptanceCriteria}</p>}{task.completionNote && <p>完成记录：{task.completionNote}</p>}</div>}
+              <TaskEnhancementSection key={`enhancements-${taskId}`} projectId={projectId} taskId={taskId} onSaved={onSaved} />
+              <TaskDocumentLinks key={`docs-${taskId}`} projectId={projectId} taskId={taskId} />
+              <p className="text-xs text-ink-faint">子任务 {local.subtaskProgress.doneCount}/{local.subtaskProgress.total} · 依赖 {local.dependencies.length} 条 · {task.iterationId ? "已加入迭代" : "未加入迭代"}</p>
+              <details className="border-t border-line pt-3"><summary className="cursor-pointer text-sm text-ink-soft">标签、依赖与阻塞</summary><div className="mt-3 space-y-4">{local.labels.map(l => <span key={l.id} className="ac-badge mr-2">{l.name}</span>)}
+                {canWrite && local.allowedActions.edit && <><BlockControl projectId={projectId} taskId={task.id} task={task} onUpdated={next => setLocal(current => current ? { ...current, task: next } : current)} onReload={() => { refetch(); onSaved?.(); }} /><LabelDependencyForm key={`associations-${task.updatedAt}`} projectId={projectId} taskId={task.id} expectedUpdatedAt={task.updatedAt} currentLabelIds={local.labels.map(l => l.id)} currentSuccessorIds={local.dependencies.filter(d => d.predecessorId === task.id).map(d => d.successorId)} allLabels={allLabels} allTasks={allTasks} onSaved={handleLabelDependencySaved} /></>}
+              </div></details>
+              {feedback.length > 0 && <details><summary className="text-sm">来源反馈（{feedback.length}）</summary>{feedback.map(f => <p key={f.id} className="my-2 rounded-lg bg-sunken p-3 text-sm">{f.comment}</p>)}</details>}
+              {canWrite && local.allowedActions.delete && <button type="button" disabled={deleting} onClick={() => void handleDelete()} className="text-xs text-high underline">{deleting ? "删除中…" : "删除任务"}</button>}
+            </div>
+          </main>
+          <div role="separator" tabIndex={0} aria-label="调整任务与沟通区宽度" aria-orientation="vertical" aria-valuemin={38} aria-valuemax={68} aria-valuenow={split} className="group relative z-10 flex w-3 shrink-0 cursor-col-resize touch-none items-center justify-center border-x border-line bg-sunken/40 outline-none hover:bg-primary/10 focus:bg-primary/20"
+            onKeyDown={e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); changeSplit(split + (e.key === "ArrowLeft" ? -2 : 2)); } if (e.key === "Home") changeSplit(38); if (e.key === "End") changeSplit(68); }}
+            onDoubleClick={() => changeSplit(55)}
+            onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); }}
+            onPointerMove={e => { if (!e.currentTarget.hasPointerCapture(e.pointerId) || !splitRef.current) return; const bounds = splitRef.current.getBoundingClientRect(); changeSplit((e.clientX - bounds.left) / bounds.width * 100); }}
+            onPointerUp={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}><span className="h-12 w-1 rounded-full bg-line group-hover:bg-primary" /></div>
+          <aside className="min-w-0 flex-1 bg-sunken/20 p-5"><TaskCollaboration key={taskId} projectId={projectId} taskId={taskId} /></aside>
+        </div>}
+      </div>
     </div>
   );
 }
@@ -737,15 +495,6 @@ function LabelDependencyForm({
         </button>
       </div>
     </form>
-  );
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-ink-faint">{label}</dt>
-      <dd className="text-ink">{value}</dd>
-    </div>
   );
 }
 

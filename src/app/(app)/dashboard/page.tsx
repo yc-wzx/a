@@ -243,7 +243,7 @@ export default async function DashboardPage({
       ["schedule", "我的课表与日程", "/schedule"],
       ["notifications", "通知中心", "/notifications"],
       ["profile", "我的个人主页", `/people/${session.user.id}`],
-      ["ai", "配置个人 AI 助手", "/settings#my-ai"],
+      ["ai", "打开我的助手", "/assistant"],
       ["help", "正式使用指南", "/help"],
     ].map(([id, label, href]) => ({ id, label, href, group: "常用入口" })),
     ...(teacherAccess
@@ -670,8 +670,8 @@ export default async function DashboardPage({
             <p className="mt-2 text-xs leading-6 text-ink-soft">
               配置自己的 AI，在项目中拆解任务、拟定安排。草案由你确认后再采用。
             </p>
-            <Link href="/settings#my-ai" className="workspace-text-link mt-3">
-              配置个人助手
+            <Link href="/assistant" className="workspace-text-link mt-3">
+              打开我的助手
               <ArrowUpRight aria-hidden className="size-3.5" />
             </Link>
             <div className="mt-4 border-t border-primary/10 pt-3">

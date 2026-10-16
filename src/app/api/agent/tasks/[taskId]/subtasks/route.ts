@@ -31,6 +31,7 @@ const createSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   assigneeId: z.uuid().optional(),
+  assigneeIds: z.array(z.uuid()).max(30).optional(),
   startDate: z.string().optional(),
   dueDate: z.string().optional(),
   milestoneId: z.uuid().optional(),

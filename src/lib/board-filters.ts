@@ -13,6 +13,7 @@ export type BoardFilters = {
 
 export type FilterableTask = {
   assigneeId: string | null;
+  assignees?: { id: string }[];
   priority: string;
   milestoneId: string | null;
   dueDate: string | null;
@@ -74,7 +75,7 @@ export function applyFilters<T extends FilterableTask>(
   today: string,
 ): T[] {
   return list.filter((t) => {
-    if (f.assignee.length && !f.assignee.includes(t.assigneeId ?? "none")) return false;
+    if (f.assignee.length && ![t.assigneeId ?? "none", ...(t.assignees ?? []).map(m => m.id)].some(id => f.assignee.includes(id))) return false;
     if (f.priority.length && !f.priority.includes(t.priority)) return false;
     if (f.milestone.length && !f.milestone.includes(t.milestoneId ?? "none")) return false;
     if (f.label.length && !t.labels.some((l) => f.label.includes(l.id))) return false;

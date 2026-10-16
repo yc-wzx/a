@@ -1,3 +1,4 @@
+import { assignedTo } from "./task-assignees";
 // 工作台任务聚合：跨项目取出「分给当前登录用户的未完成任务」，并按截止日分组。
 //
 // 分层约定（同 board-filters）：分组是不含 IO、不读系统时钟的纯函数，
@@ -123,7 +124,7 @@ export async function getMyOpenTasks(actorId: string): Promise<MyTask[]> {
     .innerJoin(teamMembers, and(eq(teamMembers.teamId, projects.teamId), eq(teamMembers.userId, actorId)))
     .where(
       and(
-        eq(tasks.assigneeId, actorId),
+        assignedTo(actorId),
         ne(tasks.status, "done"),
         eq(projects.status, "active"),
       ),

@@ -130,6 +130,8 @@ export type TaskLabel = { id: string; name: string; color: string };
  * P0 阶段 isBlocked/blockedReason/blockedAt 是 P1 才落库的列，先返回字面量 false/null/null。
  */
 export type TaskSummary = {
+  /** Additive collaboration extension; legacy assigneeId remains the primary executor. */
+  assignees?: { id: string; name: string }[];
   id: string;
   projectId: string;
   title: string;
@@ -266,6 +268,7 @@ export type IterationListFilters = PageInput & {
 /* --- 任务 V1 对象式 Action --- */
 
 export type CreateTaskV1Input = {
+  assigneeIds?: string[];
   requestId: string;
   title: string;
   description?: string | null;
@@ -280,6 +283,7 @@ export type CreateTaskV1Input = {
 
 /** patch 中字段传 null 表示「清空」，省略表示「不改」。任务所属项目不允许通过 patch 修改。 */
 export type UpdateTaskV1Patch = {
+  assigneeIds?: string[];
   title?: string;
   description?: string | null;
   assigneeId?: string | null;

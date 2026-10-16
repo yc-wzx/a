@@ -31,7 +31,7 @@ export async function listTasksFiltered(
 ) {
   let list = await listProjectTasks(actorId, projectId);
   if (filters.status) list = list.filter((t) => t.status === filters.status);
-  if (filters.assigneeId) list = list.filter((t) => t.assigneeId === filters.assigneeId);
+  if (filters.assigneeId) list = list.filter((t) => (t.assigneeId === filters.assigneeId || t.assignees.some(m => m.id === filters.assigneeId)));
   if (filters.dueBefore)
     list = list.filter((t) => t.dueDate !== null && t.dueDate <= filters.dueBefore!);
   return list.map((t) => ({
@@ -41,6 +41,7 @@ export async function listTasksFiltered(
     priority: t.priority,
     dueDate: t.dueDate,
     assigneeName: t.assigneeName,
+    assignees: t.assignees,
   }));
 }
 
@@ -183,7 +184,8 @@ export const WRITE_TOOL_NAMES = [
 export type WriteToolName = (typeof WRITE_TOOL_NAMES)[number];
 
 // 草案信封：写工具 execute 的统一返回形态，供 orchestrator 识别提取
-export type DraftEnvelope = { __draft: true; tool: WriteToolName; draft: unknown };
+export type DraftEnvelope = {
+  requestId?: string; __draft: true; tool: WriteToolName; draft: unknown };
 
 function draftEnvelope(tool: WriteToolName, draft: unknown): DraftEnvelope {
   return { __draft: true, tool, draft };

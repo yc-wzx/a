@@ -1,5 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { db } from "@/db";
+import { collaborationReactions, taskComments } from "@/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
 import { runAction } from "@/lib/action-result";
 import {
   createTaskComment,
@@ -45,6 +48,8 @@ export async function getTaskCommentsAction(
           : { ...paging, offset: targetOffset },
       ),
       focusUnavailable: targetOffset === null,
+      reactions: await db.select({ messageId: collaborationReactions.messageId, userId: collaborationReactions.userId }).from(collaborationReactions).where(and(eq(collaborationReactions.channel, "team"), inArray(collaborationReactions.messageId, db.select({ id: taskComments.id }).from(taskComments).where(and(eq(taskComments.projectId, projectId), eq(taskComments.taskId, taskId)))))),
+      canWrite: access.project.status !== "archived",
       actorId: actor,
       role: access.role,
       members: (await listTeamMembers(access.project.teamId)).map((m) => ({

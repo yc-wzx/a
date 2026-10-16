@@ -62,7 +62,7 @@ export async function buildProjectSnapshot(actorId: string, projectId: string): 
         shownTasks
           .map(
             (t) =>
-              `- [${t.status}] ${t.title}｜${t.assigneeName ?? "未指派"}｜${t.dueDate ?? "无截止"}｜id=${t.id}`,
+              `- [${t.status}] ${t.title}｜${t.assignees.map(m => m.name).join("、") || t.assigneeName || "未指派"}｜${t.dueDate ?? "无截止"}｜id=${t.id}`,
           )
           .join("\n") +
         (tasks.length > shownTasks.length
