@@ -24,6 +24,7 @@ export function TaskComments({
   const search = useSearchParams(),
     focus = search.get("comment") ?? undefined;
   const focused = useRef<string | undefined>(undefined);
+  const followLatest = useRef(!focus);
   const [data, setData] = useState<Loaded | null>(null),
     [error, setError] = useState("");
   const [body, setBody] = useState(""),
@@ -45,6 +46,9 @@ export function TaskComments({
         if (!active) return;
         if (result.ok) {
           focused.current = focus;
+          if (focus) followLatest.current = false;
+          if (followLatest.current && result.data.page.nextOffset !== null)
+            setOffset(Math.floor((result.data.page.total - 1) / 20) * 20);
           setData(result.data);
           setError("");
         } else setError(result.error);
@@ -81,7 +85,7 @@ export function TaskComments({
     const poll = async () => {
       if (!document.hidden) try {
         const result = await getTaskCommentsAction(projectId, taskId, { offset, limit: 20 });
-        if (active) { if (result.ok) { setData(result.data); setError(""); } else { setData(null); setError(result.error); } }
+        if (active) { if (result.ok) { setData(result.data); setError(""); if (followLatest.current && result.data.page.nextOffset !== null) setOffset(Math.floor((result.data.page.total - 1) / 20) * 20); } else { setData(null); setError(result.error); } }
       } catch { if (active) setError("评论连接中断，正在重连；输入已保留"); }
       if (active) timer = setTimeout(poll, 1800);
     };
@@ -186,12 +190,12 @@ export function TaskComments({
             <p className="text-sm text-ink-soft">暂无评论</p>
           )}
           <nav className="flex gap-3 text-sm">
-            {data.page.nextOffset !== null && <button type="button" onClick={() => setOffset(Math.floor((data.page.total - 1) / 20) * 20)}>查看最新评论</button>}
+            {data.page.nextOffset !== null && <button type="button" onClick={() => { followLatest.current = true; setOffset(Math.floor((data.page.total - 1) / 20) * 20); }}>查看最新评论</button>}
             {data.page.offset > 0 && (
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => setOffset(Math.max(0, data.page.offset - 20))}
+                onClick={() => { followLatest.current = false; setOffset(Math.max(0, data.page.offset - 20)); }}
               >
                 上一页
               </button>
@@ -200,7 +204,7 @@ export function TaskComments({
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => setOffset(data.page.nextOffset!)}
+                onClick={() => { followLatest.current = data.page.nextOffset! + 20 >= data.page.total; setOffset(data.page.nextOffset!); }}
               >
                 下一页
               </button>
