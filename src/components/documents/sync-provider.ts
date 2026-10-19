@@ -31,6 +31,8 @@ export class DocumentSyncProvider {
   private request: Promise<void> | undefined;
   private destroyed = false;
   private blocked = false;
+  private failures = 0;
+  private retryAt = 0;
   private snapshot: SyncSnapshot;
   private listeners = new Set<(state: SyncSnapshot) => void>();
   private events = new Map<string, Set<() => void>>();
@@ -64,7 +66,7 @@ export class DocumentSyncProvider {
   start() {
     if (this.timer || this.destroyed) return;
     void this.sync().catch(() => {});
-    this.timer = setInterval(() => { void this.sync().catch(() => {}); }, 1000);
+    this.timer = setInterval(() => { if ((typeof document === "undefined" || !document.hidden) && Date.now() >= this.retryAt) void this.sync().catch(() => {}); }, 1000);
   }
   sync(): Promise<void> {
     if (this.destroyed || this.blocked) return Promise.reject(new Error("当前文档已停止同步，请保留未保存内容后重新打开。"));
@@ -84,6 +86,7 @@ export class DocumentSyncProvider {
           awareness: encodeBinary(encodeAwarenessUpdate(this.awareness, [this.doc.clientID])) }),
       });
       if (this.destroyed) return;
+      this.failures = 0; this.retryAt = 0;
       if (result.epoch !== this.epoch) {
         this.blocked = true;
         this.publish({ status: "restored", pending: this.updates.length > 0,
@@ -110,6 +113,8 @@ export class DocumentSyncProvider {
       [...(this.events.get("synced") ?? [])].forEach((callback) => callback());
     } catch (error) {
       if (this.destroyed) return;
+      this.failures += 1;
+      this.retryAt = Date.now() + Math.min(30000, 1000 * 2 ** Math.min(this.failures, 5));
       const denied = error instanceof DocumentRequestError && [401, 403, 404, 409, 410].includes(error.status);
       if (denied) this.blocked = true;
       this.publish({ status: denied ? error instanceof DocumentRequestError && error.status === 409 ? "restored" : "blocked" : "offline",

@@ -53,6 +53,7 @@ export function openTaskPreview(href: string): boolean {
   if (!target) return false;
   const next = taskPreviewHref(window.location.href, target);
   const current = window.location.pathname + window.location.search + window.location.hash;
+  if (next !== current && !window.dispatchEvent(new Event("agilecampus:before-task-change", { cancelable: true }))) return true;
   if (next !== current)
     window.history.pushState({ agileCampusTaskPreview: true }, "", next);
   return true;

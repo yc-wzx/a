@@ -47,7 +47,7 @@ import { recordNotificationIntent } from "./notifications";
 import { ConflictError, NotFoundError, ValidationError, isUniqueViolation } from "./errors";
 import { normalizePage, pageResult } from "./pagination";
 import { getProjectForUser } from "./project";
-import { requireTaskWrite } from "./task";
+import { createTask, requireTaskWrite } from "./task";
 import { SUMMARY_COLS, backlogWhere, toTaskSummary, type TaskRow } from "./task-contract";
 import { lockTaskWriteAccess } from "./task-write-access";
 import { runIdempotent } from "./write-request";
@@ -721,6 +721,27 @@ export async function assignTasks(
       () => moveTasks(tx, actorId, projectId, iterationId, input, "assign"),
     ),
   );
+}
+
+/** Website creation uses the same task and iteration services in one idempotent transaction. */
+export async function createTaskWithIteration(actorId: string, projectId: string, input: {
+  requestId: string; task: Parameters<typeof createTask>[2];
+  iteration?: { id: string; revision: number };
+}): Promise<{ id: string }> {
+  await requireTaskWrite(actorId, projectId);
+  return db.transaction(tx => runIdempotent(tx, requestKey(projectId, actorId, "task.create_with_iteration", input.requestId), input, async () => {
+    // Lock the iteration before inserting, consistently with existing assignment order.
+    if (input.iteration) {
+      const iteration = await lockIteration(tx, projectId, input.iteration.id, input.iteration.revision);
+      if (iteration.status === "completed") throw new ConflictError("已结束的迭代不能添加任务");
+    }
+    const task = await createTask(actorId, projectId, input.task, { tx });
+    if (input.iteration) await moveTasks(tx, actorId, projectId, input.iteration.id, {
+      requestId: input.requestId, expectedRevision: input.iteration.revision,
+      tasks: [{ taskId: task.id, expectedUpdatedAt: task.updatedAt.toISOString() }],
+    }, "assign");
+    return { id: task.id };
+  }));
 }
 
 export async function removeTasks(

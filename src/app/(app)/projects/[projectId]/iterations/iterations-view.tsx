@@ -133,7 +133,7 @@ export function IterationsView({
           {current.goal && <p className="text-sm text-ink-soft">{current.goal}</p>}
           <p className="text-xs text-ink-faint">
             {current.startDate} ~ {current.endDate} · 完成 {current.doneCount}/{current.taskTotal}
-            {(current.doneRatio * 100).toFixed(0)}%
+            （{(current.doneRatio * 100).toFixed(0)}%）
           </p>
           <ul className="space-y-1">
             {currentTasks.map((t) => (

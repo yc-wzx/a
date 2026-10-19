@@ -1,3 +1,4 @@
+export const metadata = { title: "所有项目 · AgileCampus" };
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { listMyProjects } from "@/lib/project";

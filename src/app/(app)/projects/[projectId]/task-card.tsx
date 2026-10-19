@@ -1,5 +1,7 @@
 "use client";
 
+import { GripVertical } from "lucide-react";
+import type { BoardColumn } from "@/lib/board-columns";
 import { useDraggable } from "@dnd-kit/core";
 import { LABEL_COLOR_CLASS } from "@/lib/board-columns";
 import type { BoardTask } from "./board";
@@ -19,16 +21,18 @@ export function TaskCard({
   allTasks,
   dependencies,
   onOpen,
+  columns, onMove,
 }: {
   task: BoardTask;
   canWrite: boolean;
   allTasks: TaskOption[];
   dependencies: { predecessorId: string; successorId: string }[];
   onOpen: () => void;
+  columns: BoardColumn[]; onMove: (taskId: string, columnKey: string) => void;
 }) {
   // 登录布局统一托管详情面板；卡片仅把点击交给 TaskWorkspace。
   // 打开详情只更新浏览器历史，不重新跳转项目页。
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: !canWrite,
   });
@@ -47,7 +51,8 @@ export function TaskCard({
       }
       className={`ac-card p-3 text-sm transition hover:shadow-md ${isDragging ? "opacity-50" : ""}`}
     >
-      <div {...listeners} {...attributes} className={canWrite ? "cursor-grab" : ""}>
+      <div>
+        {canWrite && <button type="button" ref={setActivatorNodeRef} {...listeners} {...attributes} aria-label={`拖动任务：${task.title}`} title="空格开始，左右方向键选择列，空格放下，Esc 取消" className="float-right -mr-1 -mt-1 cursor-grab rounded p-1 text-ink-faint hover:bg-sunken"><GripVertical size={16} /></button>}
         <button
           type="button"
           // 阻止冒泡：拖拽把手覆盖了整张卡片，点标题不能被当成开始拖拽
@@ -63,7 +68,7 @@ export function TaskCard({
             <span>· {task.startDate ?? "…"}→{task.dueDate ?? "…"}</span>
           )}
           <span className={`ac-badge ${PRIORITY_BADGE[task.priority] ?? "bg-low-soft text-low"}`}>
-            {task.priority}
+            {{ high: "高", medium: "中", low: "低" }[task.priority] ?? task.priority}
           </span>
         </p>
         {task.labels.length > 0 && (
@@ -94,6 +99,7 @@ export function TaskCard({
         )}
       </div>
 
+      {canWrite && <label className="mt-2 flex items-center gap-2 text-xs text-ink-soft">移动至<select aria-label={`移动任务：${task.title}`} value="" onChange={event => onMove(task.id, event.target.value)} className="min-w-0 rounded border border-line bg-surface p-1"><option value="">选择列</option>{columns.filter(c => !c.matches(task)).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></label>}
       <button
         type="button"
         onClick={onOpen}

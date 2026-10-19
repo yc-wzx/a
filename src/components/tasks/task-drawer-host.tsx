@@ -11,6 +11,7 @@ export function TaskDrawerHost() {
   const [, startTransition] = useTransition();
   const target = taskPreviewTarget(pathname, new URLSearchParams(search.toString()));
   return target ? <TaskDetailPanel
+    key={`${target.projectId}:${target.taskId}`}
     projectId={target.projectId}
     taskId={target.taskId}
     onClose={closeTaskPreview}

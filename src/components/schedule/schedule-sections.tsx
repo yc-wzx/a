@@ -1,0 +1,7 @@
+"use client";
+import { useId, useState, type ReactNode } from "react";
+export function ScheduleSections({ events, add, preferences, sharing }: { events: ReactNode; add: ReactNode; preferences: ReactNode; sharing: ReactNode }) {
+  const [tab, setTab] = useState("events"), id = useId();
+  const sections = [{ key: "events", label: "已登记日程", content: events }, { key: "add", label: "添加与导入", content: add }, { key: "preferences", label: "可投入时间", content: preferences }, { key: "sharing", label: "共享设置", content: sharing }];
+  return <><div className="flex gap-2 border-b border-line pb-3" role="tablist" aria-label="课表与日程管理">{sections.map((s, i) => <button id={`${id}-tab-${s.key}`} key={s.key} role="tab" aria-selected={tab === s.key} aria-controls={`${id}-panel-${s.key}`} tabIndex={tab === s.key ? 0 : -1} className={tab === s.key ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab(s.key)} onKeyDown={e => { if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return; e.preventDefault(); const n = e.key === "Home" ? 0 : e.key === "End" ? sections.length - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + sections.length) % sections.length; setTab(sections[n].key); document.getElementById(`${id}-tab-${sections[n].key}`)?.focus(); }}>{s.label}</button>)}</div>{sections.map(s => <div key={s.key} id={`${id}-panel-${s.key}`} role="tabpanel" aria-labelledby={`${id}-tab-${s.key}`} hidden={s.key !== tab} className="space-y-5">{s.content}</div>)}</>;
+}

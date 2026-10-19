@@ -1,10 +1,7 @@
+export const metadata = { title: "项目任务 · AgileCampus" };
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import {
-  getOrCreateScopedConversation,
-  listBoundedConversationMessages,
-} from "@/lib/agent/context";
 import { getProjectForUser, listProjectMilestones } from "@/lib/project";
 import { listTeamMembers } from "@/lib/team";
 import { listProjectTasks, listProjectDependencies } from "@/lib/task";
@@ -15,11 +12,11 @@ import { NewTaskForm } from "./new-task-form";
 import { TaskWorkspace } from "./task-workspace";
 import { SavedProjectViews } from "@/components/projects/saved-project-views";
 import { todayInShanghai } from "@/lib/dashboard";
-import { ChatPanel } from "./chat-panel";
 import { FilterBar } from "./filter-bar";
 import { ProjectNav } from "@/components/projects/project-nav";
 import { ProjectLeadership } from "@/components/projects/project-leadership";
-import { getMyAiSettings } from "@/lib/agent/personal-settings";
+import Link from "next/link";
+import { listProjectIterations } from "@/lib/iteration";
 import { getProjectDoingLimit } from "@/lib/task-enhancements";
 import { ProjectDoingLimitControl } from "@/components/tasks/project-doing-limit";
 
@@ -46,7 +43,7 @@ export default async function ProjectPage({
     members,
     dependencies,
     teamLabels,
-    myAi,
+    iterationPage,
     doingLimit,
   ] = await Promise.all([
     listProjectMilestones(session.user.id, projectId),
@@ -54,7 +51,7 @@ export default async function ProjectPage({
     listTeamMembers(project.teamId),
     listProjectDependencies(session.user.id, projectId),
     listTeamLabels(session.user.id, project.teamId),
-    getMyAiSettings(session.user.id),
+    listProjectIterations(session.user.id, projectId, { limit: 100 }),
     getProjectDoingLimit(session.user.id, projectId),
   ]);
 
@@ -75,19 +72,6 @@ export default async function ProjectPage({
   // 登录布局的单例详情侧栏由 URL 驱动，取数仍由面板自己处理：
   // 它按 taskId 调 getTaskPanelContextAction，挂载与切换都重新鉴权。取不到只影响面板本身，
   // 用户还在看板上，不会因为一个失效的深链就丢掉整页上下文。
-
-  const latestConv = await getOrCreateScopedConversation(
-    session.user.id,
-    projectId,
-    { scope: "personal" },
-  );
-  const history = (
-    await listBoundedConversationMessages(session.user.id, latestConv.id)
-  ).items;
-
-  const initialMessages = history
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
   return (
     <main className="mx-auto max-w-5xl space-y-8 py-8">
@@ -113,6 +97,18 @@ export default async function ProjectPage({
         </p>
       </header>
 
+      {canWrite && (
+        <NewTaskForm
+          projectId={projectId}
+          iterations={iterationPage.items.filter(i => i.status !== "completed").map(i => ({ id: i.id, name: i.name, revision: i.revision }))}
+          members={members}
+          milestones={projectMilestones.map((m) => ({
+            id: m.id,
+            title: m.title,
+          }))}
+        />
+      )}
+
       <ProjectLeadership
         actorId={session.user.id}
         projectId={projectId}
@@ -127,7 +123,7 @@ export default async function ProjectPage({
       />
 
       <section className="space-y-3" data-tour="board">
-        <h2 className="font-medium text-ink">项目任务</h2>
+        <div className="flex items-center justify-between"><h2 className="font-medium text-ink">项目任务</h2><Link className="ac-btn-ghost text-sm" href={`/projects/${projectId}/ai-drafts`}>打开我的项目助手</Link></div>
         <p className="text-xs text-ink-soft">
           在看板、列表或甘特图中点击任务打开详情，可查看、修改或删除。删除主任务会同时删除其子任务；老师角色只读。
         </p>
@@ -168,6 +164,7 @@ export default async function ProjectPage({
             parentTaskId: t.parentTaskId,
           }))}
           canWrite={canWrite}
+          doingLimit={doingLimit}
           members={members}
           milestones={projectMilestones.map((m) => ({
             id: m.id,
@@ -178,26 +175,7 @@ export default async function ProjectPage({
         />
       </section>
 
-      <ChatPanel
-        assistantName={myAi.assistantName}
-        projectId={projectId}
-        scope="personal"
-        conversationId={latestConv.id}
-        initialMessages={initialMessages}
-        members={members}
-        milestones={projectMilestones.map((m) => ({ id: m.id, name: m.title }))}
-      />
 
-      {canWrite && (
-        <NewTaskForm
-          projectId={projectId}
-          members={members}
-          milestones={projectMilestones.map((m) => ({
-            id: m.id,
-            title: m.title,
-          }))}
-        />
-      )}
     </main>
   );
 }

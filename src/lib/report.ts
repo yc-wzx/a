@@ -270,7 +270,7 @@ export async function exportWeeklyReportMarkdown(
     if (!items.length) lines.push("暂无记录");
     for (const item of items) {
       lines.push(
-        `- ${escapeMarkdown(item.title)}：${escapeMarkdown(item.summary)}`,
+        `- ${escapeMarkdown(item.title)}${item.summary.trim() && item.summary.trim() !== item.title.trim() ? `：${escapeMarkdown(item.summary)}` : ""}`,
       );
       for (const source of item.sourceRefs)
         if (source.sourceHref)

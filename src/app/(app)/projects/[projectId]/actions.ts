@@ -3,16 +3,18 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { createTask, updateTask, deleteTask, setTaskSuccessors } from "@/lib/task";
+import { updateTask, deleteTask, setTaskSuccessors } from "@/lib/task";
+import { createTaskWithIteration } from "@/lib/iteration";
 import { setTaskLabels } from "@/lib/label";
 import { createMilestone } from "@/lib/project";
 import { AppError, ForbiddenError } from "@/lib/errors";
 
-export type FormState = { error: string } | null;
+export type FormState = { error?: string; createdId?: string } | null;
 // 更新任务专用：成功回 { ok: true }，供编辑弹窗据以自闭
 export type UpdateTaskState = { error: string } | { ok: true } | null;
 
 const createTaskSchema = z.object({
+  requestId: z.uuid().optional(), iterationId: z.uuid().optional(), iterationRevision: z.coerce.number().int().nonnegative().optional(),
   projectId: z.uuid(),
   title: z.string().trim().min(1, "请填写任务标题"),
   description: z.string().trim().optional(),
@@ -40,19 +42,22 @@ export async function createTaskAction(
     dueDate: raw.dueDate || undefined,
     milestoneId: raw.milestoneId || undefined,
     priority: raw.priority || undefined,
+    requestId: raw.requestId || undefined, iterationId: raw.iterationId || undefined, iterationRevision: raw.iterationRevision || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const { projectId, ...input } = parsed.data;
+  const { projectId, requestId, iterationId, iterationRevision, ...input } = parsed.data;
+  let createdId: string;
   try {
-    await createTask(session.user.id, projectId, input);
+    const result = await createTaskWithIteration(session.user.id, projectId, { requestId: requestId ?? crypto.randomUUID(), task: input, ...(iterationId ? { iteration: { id: iterationId, revision: iterationRevision ?? -1 } } : {}) });
+    createdId = result.id;
   } catch (e) {
     if (e instanceof ForbiddenError) return { error: "没有权限创建任务" };
     if (e instanceof AppError) return { error: e.message };
     throw e;
   }
-  revalidatePath(`/projects/${projectId}`);
-  return null;
+  revalidatePath(`/projects/${projectId}`); revalidatePath(`/projects/${projectId}/iterations`);
+  return { createdId };
 }
 
 const createMilestoneSchema = z.object({

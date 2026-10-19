@@ -1,3 +1,4 @@
+export const metadata = { title: "项目周报 · AgileCampus" };
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
@@ -84,7 +85,7 @@ export default async function Page({
                     className="border-t border-line pt-3"
                   >
                     <h3 className="text-sm font-medium">{item.title}</h3>
-                    <p className="text-sm text-ink-soft">{item.summary}</p>
+                    {item.summary.trim() && item.summary.trim() !== item.title.trim() && <p className="text-sm text-ink-soft">{item.summary}</p>}
                     {item.sourceRefs.map(
                       (source) =>
                         source.sourceHref && (

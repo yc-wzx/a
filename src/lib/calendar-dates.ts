@@ -31,6 +31,22 @@ export function entriesOnDay(entries: CalendarEntry[], day: string) {
 export function calendarClock(instant: string) {
   return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(instant));
 }
+/** Inclusive date ranges become one clipped bar per visible week, with no lost overlaps. */
+export function rangeLayout(entries: CalendarEntry[], startDate: string, count = 7) {
+  const endDate = calendarDayOffset(startDate, count - 1);
+  const ranges = entries.filter(e => e.when === "range" && e.date <= endDate && e.endDate >= startDate)
+    .sort((a, b) => a.when === "range" && b.when === "range" ? a.date.localeCompare(b.date) || b.endDate.localeCompare(a.endDate) || a.id.localeCompare(b.id) : 0);
+  const laneEnds: number[] = [];
+  return ranges.map(entry => {
+    if (entry.when !== "range") throw new Error("Expected a date range");
+    const start = Math.max(0, Math.round((Date.parse(entry.date) - Date.parse(startDate)) / DAY_MS));
+    const end = Math.min(count - 1, Math.round((Date.parse(entry.endDate) - Date.parse(startDate)) / DAY_MS));
+    let lane = laneEnds.findIndex(last => last < start);
+    if (lane < 0) lane = laneEnds.length;
+    laneEnds[lane] = end;
+    return { entry, start, end, lane, continuesBefore: entry.date < startDate, continuesAfter: entry.endDate > endDate };
+  });
+}
 export function entryTime(e: CalendarEntry, day: string) {
   if (e.when === "range") return `${e.date.slice(5)} — ${e.endDate.slice(5)} · 迭代`;
   if (e.when === "date") return `${e.kind === "task" ? "任务" : e.kind === "milestone" ? "里程碑" : "项目"}截止${e.done ? " · 已完成" : ""}`;

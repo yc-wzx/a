@@ -35,6 +35,7 @@ export function TaskWorkspace(props: {
   allTasks: { id: string; title: string }[];
   dependencies: { predecessorId: string; successorId: string }[];
   today: string;
+  doingLimit?: { doingLimit: number | null; doingCount: number; exceeded: boolean };
 }) {
   const { tasks, today, groupBy, members, milestones } = props;
   const router = useRouter(),
@@ -219,6 +220,7 @@ function ProjectGantt({
 }: {
   tasks: BoardTask[];
   today: string;
+  doingLimit?: { doingLimit: number | null; doingCount: number; exceeded: boolean };
   milestones: Option[];
   onOpen: (id: string) => void;
   activeId: string | null;

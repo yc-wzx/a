@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db, type DbTx } from "@/db";
-import { ForbiddenError } from "./errors";
+import { AppError, ForbiddenError } from "./errors";
 import {
   claimWriteRequest,
   finishWriteRequest,
@@ -21,12 +21,13 @@ export async function projectMutation<T>(
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${key.projectId}, 0))`,
       );
-    const rows = await tx.execute<{ role: string }>(sql`
-      select m.role from projects p join team_members m on m.team_id = p.team_id
+    const rows = await tx.execute<{ role: string; status: string }>(sql`
+      select m.role, p.status from projects p join team_members m on m.team_id = p.team_id
       where p.id = ${key.projectId} and m.user_id = ${key.actorId} for share of p, m
     `);
     const role = rows[0]?.role;
     if (!role || !roles.includes(role)) throw new ForbiddenError();
+    if (rows[0].status === "archived") throw new AppError("项目已归档，请恢复后再操作");
     const claim = await claimWriteRequest(tx, key, hashRequest(payload));
     if (claim.replay) {
       if (key.operation.startsWith("comment.")) {

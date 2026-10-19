@@ -6,7 +6,7 @@
  *
  * 两条自我约束：
  * - 取不到的数据一律按“未完成”，不能因为接口不可用就把项目说成已完成；
- * - 没有真实入口的步骤不给 href，避免放假链接（目前只有“项目简介”没有编辑入口）。
+ * - 引导只链接真实入口，权限仍由目标页面和服务检查。
  */
 import type { CurrentIteration, ProjectTaskStats, QueryPart } from "@/contracts/p0-p2";
 
@@ -38,7 +38,8 @@ export function deriveSetupSteps(input: SetupStepInput): SetupStep[] {
       key: "goal",
       label: "写下项目简介 / 目标",
       done: Boolean(description?.trim()),
-      hint: "让成员知道这个项目要做什么；项目简介编辑入口尚待接入",
+      hint: "由团队管理员在项目设置中填写目标与说明",
+      href: `/projects/${projectId}/settings`,
     },
     {
       key: "milestone",

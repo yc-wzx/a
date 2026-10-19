@@ -128,27 +128,32 @@ export async function updateProject(
     endDate?: string | null;
     status?: ProjectStatus;
   },
+  expectedVersion?: string,
 ) {
-  const access = await getProjectForUser(actorId, projectId);
-  if (!access) throw new ForbiddenError();
-  if (access.role !== "admin") throw new ForbiddenError();
+  const parsed = z.object({
+    name: z.string().trim().min(1, "请填写项目名称").max(200).optional(),
+    description: z.string().trim().max(10000).nullable().optional(),
+    startDate: z.iso.date().nullable().optional(),
+    endDate: z.iso.date().nullable().optional(),
+    status: z.enum(["active", "archived"]).optional(),
+  }).safeParse(patch);
+  if (!parsed.success) throw new AppError(parsed.error.issues[0].message);
+  return db.transaction(async tx => {
+    const [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
+    if (!project) throw new ForbiddenError();
+    const [member] = await tx.select().from(teamMembers).where(and(eq(teamMembers.teamId, project.teamId), eq(teamMembers.userId, actorId))).for("share");
+    if (member?.role !== "admin") throw new ForbiddenError();
+    if (expectedVersion && expectedVersion !== projectVersion(project)) throw new ConflictError("项目已被其他人修改，请刷新后重试");
+    const next = { ...project, ...parsed.data };
+    if (next.startDate && next.endDate && next.startDate > next.endDate) throw new AppError("结束日期不能早于开始日期");
+    if (!Object.keys(parsed.data).length) return project;
+    const [updated] = await tx.update(projects).set(parsed.data).where(eq(projects.id, projectId)).returning();
+    return updated;
+  });
+}
 
-  // 显式白名单构造，勿用 ...patch 展开：运行时宽对象可夹带 teamId 等越权字段（同 task.ts 之诫）
-  const [updated] = await db
-    .update(projects)
-    .set({
-      ...(patch.name !== undefined && { name: patch.name }),
-      ...(patch.description !== undefined && {
-        description: patch.description,
-      }),
-      ...(patch.startDate !== undefined && { startDate: patch.startDate }),
-      ...(patch.endDate !== undefined && { endDate: patch.endDate }),
-      ...(patch.status !== undefined && { status: patch.status }),
-    })
-    .where(eq(projects.id, projectId))
-    .returning();
-  if (!updated) throw new AppError("项目不存在");
-  return updated;
+export function projectVersion(project: typeof projects.$inferSelect) {
+  return createHash("sha256").update(JSON.stringify([project.name, project.description, project.startDate, project.endDate, project.status])).digest("hex");
 }
 
 // 项目详情聚合：项目本体 + 里程碑 + 任务状态计数。供 Agent API 一次取回全貌。
@@ -194,10 +199,13 @@ export async function createMilestone(
   projectId: string,
   input: { title: string; targetDate?: string },
   opts?: { tx: import("@/db").DbTx },
-) {
-  const access = await getProjectForUser(actorId, projectId);
+): Promise<typeof milestones.$inferSelect> {
+  if (!opts?.tx) return db.transaction(tx => createMilestone(actorId, projectId, input, { tx }));
+  const tx = opts.tx;
+  const [access] = await tx.select({ status: projects.status, role: teamMembers.role }).from(projects).innerJoin(teamMembers, eq(teamMembers.teamId, projects.teamId)).where(and(eq(projects.id, projectId), eq(teamMembers.userId, actorId))).for("share");
   if (!access || access.role !== "admin") throw new ForbiddenError();
-  const [milestone] = await (opts?.tx ?? db)
+  if (access.status === "archived") throw new AppError("项目已归档，请恢复后再添加里程碑");
+  const [milestone] = await tx
     .insert(milestones)
     .values({ projectId, title: input.title, targetDate: input.targetDate })
     .returning();

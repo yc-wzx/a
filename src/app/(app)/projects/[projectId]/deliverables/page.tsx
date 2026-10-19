@@ -1,3 +1,4 @@
+export const metadata = { title: "项目成果 · AgileCampus" };
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
