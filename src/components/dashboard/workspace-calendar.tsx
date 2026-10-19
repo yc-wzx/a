@@ -5,7 +5,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, ListTodo, LockKeyhole, Refresh
 import Link from "next/link";
 import { TaskLink } from "@/components/tasks/task-link";
 import type { CalendarEntry, CalendarSource, WorkspaceCalendar } from "@/contracts/workspace-calendar";
-import { calendarDayOffset, calendarRange, dayLayout, entriesOnDay, entryTime, moveCalendar, type CalendarView } from "@/lib/calendar-dates";
+import { calendarDayOffset, calendarRange, rangeLayout, dayLayout, entriesOnDay, entryTime, moveCalendar, type CalendarView } from "@/lib/calendar-dates";
 import "./workspace-calendar.css";
 
 const sources: { key: CalendarSource; label: string }[] = [{ key: "schedule", label: "课程与日程" }, { key: "work", label: "工作安排" }, { key: "deadline", label: "截止节点" }];
@@ -56,6 +56,7 @@ export function WorkspaceCalendarPanel({ today, taskVersion, taskCount, children
   const changeView = (next: CalendarView) => { setAnchor(selected); setView(next); };
   const timed = days.flatMap(day => dayLayout(entries, day));
   const firstHour = Math.min(8, ...timed.map(e => Math.floor(e.start / 60))), lastHour = Math.max(22, ...timed.map(e => Math.ceil(e.end / 60)));
+  const bars = rangeLayout(entries, range.startDate);
   const hourHeight = 52;
   useEffect(() => {
     if (view === "week" && data && weekScroll.current) weekScroll.current.scrollTop = Math.max(0, 8 - firstHour) * hourHeight;
@@ -76,15 +77,16 @@ export function WorkspaceCalendarPanel({ today, taskVersion, taskCount, children
         <div className="wc-layout"><div className="wc-main">
           {view === "week" && <div className="wc-week-scroll" ref={weekScroll} tabIndex={0} role="region" aria-label="周日历，滚动查看全天安排"><div className="wc-week">
             <div className="wc-week-head"><span className="wc-axis-label">日期</span>{days.map((day, n) => <button key={day} type="button" aria-label={`选择 ${day}`} aria-pressed={selected === day} className={`${selected === day ? "wc-selected" : ""} ${day === today ? "wc-today" : ""}`} onClick={() => choose(day)}><span>周{weekdays[n]}</span><b>{Number(day.slice(8))}</b></button>)}</div>
-            <div className="wc-date-row"><span className="wc-axis-label">日期节点</span>{days.map(day => <div key={day} className={day === selected ? "wc-day-selected" : ""}>{entriesOnDay(entries, day).filter(e => e.when !== "time").map(e => <EntryLink key={e.id} entry={e} day={day} today={today} compact />)}</div>)}</div>
+            <div className="wc-range-row" aria-label="本周迭代区间"><span className="wc-axis-label">迭代</span><div className="wc-range-bars">{bars.map(bar => <div key={bar.entry.id} style={{ gridColumn: `${bar.start + 1} / ${bar.end + 2}`, gridRow: bar.lane + 1 }}><EntryLink entry={bar.entry} day={range.startDate} today={today} compact /></div>)}</div></div>
+            <div className="wc-date-row"><span className="wc-axis-label">日期节点</span>{days.map(day => <div key={day} className={day === selected ? "wc-day-selected" : ""}>{entriesOnDay(entries, day).filter(e => e.when === "date").map(e => <EntryLink key={e.id} entry={e} day={day} today={today} compact />)}</div>)}</div>
             <div className="wc-time-grid" style={{ height: (lastHour - firstHour) * hourHeight }}><div className="wc-axis">{Array.from({ length: lastHour - firstHour }, (_, n) => <span key={n} style={{ top: n * hourHeight }}>{String(n + firstHour).padStart(2, "0")}:00</span>)}</div>{days.map(day => <div key={day} className={`wc-time-day ${day === selected ? "wc-day-selected" : ""}`} style={{ backgroundSize: `100% ${hourHeight}px` }}>
               {dayLayout(entries, day).map(item => <div key={item.entry.id} className="wc-position" style={{ top: (item.start / 60 - firstHour) * hourHeight, height: Math.max(18, (item.end - item.start) / 60 * hourHeight), left: `${item.lane / item.lanes * 100}%`, width: `${100 / item.lanes}%` }}><EntryLink entry={item.entry} day={day} today={today} compact={item.end - item.start < 40} /></div>)}
             </div>)}</div>
           </div></div>}
-          {view === "month" && <div className="wc-month"><div className="wc-month-head">{weekdays.map(d => <span key={d}>周{d}</span>)}</div><div className="wc-month-cells">{days.map(day => {
-            const list = entriesOnDay(entries, day);
+          {view === "month" && <div className="wc-month"><div className="wc-month-head">{weekdays.map(d => <span key={d}>周{d}</span>)}</div>{Array.from({ length: 6 }, (_, week) => { const weekDays = days.slice(week * 7, week * 7 + 7); return <div key={week} className="wc-month-week"><div className="wc-range-bars" aria-label={`第 ${week + 1} 周迭代`}>{rangeLayout(entries, weekDays[0]).map(bar => <div key={bar.entry.id} style={{ gridColumn: `${bar.start + 1} / ${bar.end + 2}`, gridRow: bar.lane + 1 }}><EntryLink entry={bar.entry} day={weekDays[0]} today={today} compact /></div>)}</div><div className="wc-month-cells">{weekDays.map(day => {
+            const list = entriesOnDay(entries, day).filter(e => e.when !== "range");
             return <div key={day} className={`wc-month-cell ${day.slice(0, 7) !== anchor.slice(0, 7) ? "wc-outside" : ""} ${day === selected ? "wc-day-selected" : ""}`}><button type="button" className={day === today ? "wc-today-number" : ""} aria-label={`选择 ${day}`} aria-pressed={selected === day} onClick={() => choose(day)}>{Number(day.slice(8))}</button>{list.slice(0, 3).map(e => <EntryLink key={e.id} entry={e} day={day} today={today} compact />)}{list.length > 3 && <button type="button" className="wc-more" onClick={() => choose(day)}>另有 {list.length - 3} 项</button>}</div>;
-          })}</div></div>}
+          })}</div></div>; })}</div>}
           {view === "agenda" && <div className="wc-agenda">{days.map(day => {
             const list = entriesOnDay(entries, day);
             return list.length ? <section key={day}><button type="button" className={`wc-agenda-date ${day === selected ? "wc-selected" : ""}`} onClick={() => choose(day)}>{dayTitle(day)}{day === today && <span>今天</span>}</button><div>{list.map(e => <EntryLink key={e.id} entry={e} day={day} today={today} />)}</div></section> : null;

@@ -47,7 +47,7 @@ export function CalendarDownload({ projectId }: { projectId: string }) {
           }
         }}
       >
-        {pending ? "导出中…" : "导出截止日期"}
+        {pending ? "导出中…" : "导出日历节点"}
       </button>
       {message && (
         <p role="status" className="max-w-sm text-xs text-ink-soft">

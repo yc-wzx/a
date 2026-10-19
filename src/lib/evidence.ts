@@ -238,7 +238,7 @@ export async function exportProjectEvidenceMarkdown(
     lines.push(
       `## ${escapeMarkdown(item.title)}`,
       `${item.kind} · ${item.occurredAt}`,
-      escapeMarkdown(item.summary),
+      item.summary.trim() !== item.title.trim() ? escapeMarkdown(item.summary) : "",
       `参与身份：${item.identities.map((i) => `${i.role}:${i.userId}`).join("、")}`,
       item.sourceRef.sourceHref
         ? `[查看来源](${new URL(item.sourceRef.sourceHref, process.env.AGILECAMPUS_URL || "http://localhost:3000").href})`

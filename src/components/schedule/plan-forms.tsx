@@ -157,7 +157,7 @@ export function PersonalPlanGenerator({
               </span>
             </label>
             <label className="text-xs">
-              剩余分钟
+              {selected.includes(task.id) ? "剩余分钟" : "勾选后填写"}
               <input
                 aria-label={`${task.title}剩余分钟`}
                 name={"minutes:" + task.id}
@@ -180,7 +180,8 @@ export function PersonalPlanGenerator({
         个人课表标题不会发送给模型，只提供可投入时间统计；任务目标、进度和你填写的要求会用于生成。草案不会改动任务和团队迭代。
       </p>
       <Feedback error={error} />
-      <button disabled={pending || !selected.length} className="ac-btn">
+      {!selected.length && <p id="plan-selection-hint" role="status" className="text-sm text-ink-soft">先勾选至少一项本人任务，再填写预计剩余分钟，即可生成草案。</p>}
+      <button aria-describedby={!selected.length ? "plan-selection-hint" : undefined} disabled={pending || !selected.length} className="ac-btn">
         {pending ? "生成中…" : "生成短期计划草案"}
       </button>
     </form>

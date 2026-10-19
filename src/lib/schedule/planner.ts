@@ -563,7 +563,7 @@ export async function generatePersonalPlan(
       );
     const planTasks: PlanTask[] = ordered.map((t) => ({
       ...t,
-      objective: details.get(t.id)?.objective ?? `推进：${t.title}`,
+      objective: details.get(t.id)?.objective ?? `推进${t.title}`,
       reason:
         details.get(t.id)?.reason ??
         "按阶段期限、进行中状态和优先级安排；工时为本人估计。",

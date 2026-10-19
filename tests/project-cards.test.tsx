@@ -205,10 +205,10 @@ describe("RiskCard", () => {
   it("展示规则名、消息、阈值、观察值和真实来源", () => {
     const html = renderToStaticMarkup(<RiskCard item={RISK} />);
     expect(html).toContain(RISK_RULE_LABELS.overdue_task);
-    expect(html).toContain("overdue_task");
+    expect(html).not.toContain("overdue_task");
     expect(html).toContain("有 2 个主任务已逾期");
-    expect(html).toContain("daysOverdue=1");
-    expect(html).toContain("overdueCount=2");
+    expect(html).toContain("逾期天数：1");
+    expect(html).toContain("逾期任务数：2");
     expect(html).toContain(`/projects/${PROJECT_ID}?task=${TASK_ID}`);
     expect(html).toContain("打开任务");
   });

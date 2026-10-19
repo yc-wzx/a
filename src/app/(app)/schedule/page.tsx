@@ -1,3 +1,5 @@
+export const metadata = { title: "课表与日程 · AgileCampus" };
+import { ScheduleSections } from "@/components/schedule/schedule-sections";
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
@@ -60,10 +62,8 @@ export default async function Page({
           选择项目进行规划
         </Link>
       </header>
-      <section className="ac-card space-y-3 p-4">
-        <h2 className="font-semibold">补充临时事件</h2>
-        <EmergencyForm requestId={randomUUID()} />
-      </section>
+      <ScheduleSections
+        events={<>
       {!!reviewPlans.length && (
         <section className="ac-card space-y-3 p-4">
           <h2 className="font-semibold">需要重新核对的个人安排</h2>
@@ -82,54 +82,6 @@ export default async function Page({
           ))}
         </section>
       )}
-      <section className="ac-card space-y-3 p-4">
-        <h2 className="font-semibold">日程共享设置</h2>
-        <SharingForm
-          teams={myTeams}
-          teamIds={data.sharedTeamIds}
-          shareWorkPlans={data.shareWorkPlans}
-          revision={data.sharingRevision}
-          requestId={randomUUID()}
-        />
-        {myTeams.map((t) => (
-          <Link
-            key={t.id}
-            prefetch={false}
-            href={`/teams/${t.id}/availability`}
-            className="block text-sm text-primary underline"
-          >
-            查看{t.name}的团队忙碌日程
-          </Link>
-        ))}
-      </section>
-      <section className="ac-card space-y-3 p-4">
-        <h2 className="font-semibold">可投入时间</h2>
-        <p className="text-xs text-ink-soft">
-          未上课不等于可以工作。只在你设置的时段内规划，每天最多 4
-          小时；请把休息、考试和其他占用时间登记完整。
-        </p>
-        <PreferencesForm
-          preferences={data.preferences}
-          revision={data.revision}
-          requestId={randomUUID()}
-        />
-      </section>
-      <section className="ac-card space-y-3 p-4">
-        <h2 className="font-semibold">导入课表／日历</h2>
-        <ImportForm
-          startDate={shanghaiDay()}
-          endDate={addDays(shanghaiDay(), 90)}
-          requestId={randomUUID()}
-        />
-      </section>
-      <details className="ac-card p-4">
-        <summary className="cursor-pointer font-semibold">
-          手动补充日程／每周课程
-        </summary>
-        <div className="mt-3">
-          <ManualForm requestId={randomUUID()} />
-        </div>
-      </details>
       <section className="space-y-3">
         <h2 className="font-semibold">已登记日程</h2>
         <form className="flex flex-wrap items-end gap-2">
@@ -194,6 +146,66 @@ export default async function Page({
           )}
         </nav>
       </section>
+        </>}
+        add={<>
+      <section className="ac-card space-y-3 p-4">
+        <h2 className="font-semibold">补充临时事件</h2>
+        <EmergencyForm requestId={randomUUID()} />
+      </section>
+      <section className="ac-card space-y-3 p-4">
+        <h2 className="font-semibold">导入课表／日历</h2>
+        <ImportForm
+          startDate={shanghaiDay()}
+          endDate={addDays(shanghaiDay(), 90)}
+          requestId={randomUUID()}
+        />
+      </section>
+      <details className="ac-card p-4">
+        <summary className="cursor-pointer font-semibold">
+          手动补充日程／每周课程
+        </summary>
+        <div className="mt-3">
+          <ManualForm requestId={randomUUID()} />
+        </div>
+      </details>
+        </>}
+        preferences={<>
+      <section className="ac-card space-y-3 p-4">
+        <h2 className="font-semibold">可投入时间</h2>
+        <p className="text-xs text-ink-soft">
+          未上课不等于可以工作。只在你设置的时段内规划，每天最多 4
+          小时；请把休息、考试和其他占用时间登记完整。
+        </p>
+        <PreferencesForm
+          preferences={data.preferences}
+          revision={data.revision}
+          requestId={randomUUID()}
+        />
+      </section>
+        </>}
+        sharing={<>
+      <section className="ac-card space-y-3 p-4">
+        <h2 className="font-semibold">日程共享设置</h2>
+        <SharingForm
+          teams={myTeams}
+          teamIds={data.sharedTeamIds}
+          shareWorkPlans={data.shareWorkPlans}
+          revision={data.sharingRevision}
+          requestId={randomUUID()}
+        />
+        {myTeams.map((t) => (
+          <Link
+            key={t.id}
+            prefetch={false}
+            href={`/teams/${t.id}/availability`}
+            className="block text-sm text-primary underline"
+          >
+            查看{t.name}的团队忙碌日程
+          </Link>
+        ))}
+      </section>
+        </>}
+      />
     </main>
   );
 }

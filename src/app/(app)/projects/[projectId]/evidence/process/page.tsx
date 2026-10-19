@@ -226,7 +226,7 @@ export default async function Page({
                 })}
               </p>
               <h2 className="font-semibold">{item.title}</h2>
-              <p className="whitespace-pre-wrap text-sm">{item.summary}</p>
+              {item.summary.trim() && item.summary.trim() !== item.title.trim() && <p className="whitespace-pre-wrap text-sm">{item.summary}</p>}
               <p className="text-xs text-ink-soft">
                 {item.identities
                   .map(

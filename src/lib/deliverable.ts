@@ -45,18 +45,18 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
 }
 
 type Deliverable = typeof deliverables.$inferSelect;
-function view(row: Deliverable, actorId: string, role: TeamRole) {
+function view(row: Deliverable, actorId: string, role: TeamRole, archived = false) {
   // Request metadata is internal; clients receive only business fields and allowed operations.
   const { creationKey, creationHash, workingCopy, ...data } = row;
   void creationKey; void creationHash;
-  const writer = role === "admin" || (role === "student" && row.authorId === actorId);
+  const writer = !archived && (role === "admin" || (role === "student" && row.authorId === actorId));
   const canWrite = writer && (row.status === "draft" || workingCopy !== null);
   const privateCopy = workingCopy && (role === "admin" || row.authorId === actorId)
     ? { title: workingCopy.title, type: workingCopy.type, url: workingCopy.url, description: workingCopy.description, milestoneId: workingCopy.milestoneId } : null;
   return { ...data, workingCopy: privateCopy, allowedActions: {
     edit: canWrite, submit: canWrite,
     startRevision: writer && !workingCopy && ["approved", "changes_requested"].includes(row.status),
-    review: row.status === "submitted" && role !== "student" && row.authorId !== actorId,
+    review: !archived && row.status === "submitted" && role !== "student" && row.authorId !== actorId,
   } };
 }
 
@@ -70,11 +70,12 @@ async function requireReadAccess(actorId: string, projectId: string) {
 // Same team-membership rule as getProjectForUser, with transactional locks so a role
 // change/removal cannot race a write. Do not add a separate project-membership model.
 async function lockAccess(tx: DbTx, actorId: string, projectId: string) {
-  const [access] = await tx.select({ role: teamMembers.role })
+  const [access] = await tx.select({ role: teamMembers.role, status: projects.status })
     .from(projects).innerJoin(teamMembers, eq(teamMembers.teamId, projects.teamId))
     .where(and(eq(projects.id, projectId), eq(teamMembers.userId, actorId)))
     .for("share");
   if (!access) throw new ForbiddenError();
+  if (access.status === "archived") throw new AppError("项目已归档，请恢复后再操作成果");
   return access;
 }
 
@@ -98,17 +99,17 @@ async function lockDeliverable(tx: DbTx, projectId: string, deliverableId: strin
 }
 
 export async function listProjectDeliverables(actorId: string, projectId: string) {
-  const { role } = await requireReadAccess(actorId, projectId);
+  const { role, project } = await requireReadAccess(actorId, projectId);
   const rows = await db.select().from(deliverables).where(and(
     eq(deliverables.projectId, projectId),
     role === "admin" ? undefined : or(ne(deliverables.status, "draft"), eq(deliverables.authorId, actorId)),
   )).orderBy(desc(deliverables.createdAt), desc(deliverables.id));
-  return rows.map((row) => view(row, actorId, role));
+  return rows.map((row) => view(row, actorId, role, project.status === "archived"));
 }
 
 export async function getDeliverableDetail(actorId: string, projectId: string, deliverableId: string) {
   parse(uuid, deliverableId);
-  const { role } = await requireReadAccess(actorId, projectId);
+  const { role, project } = await requireReadAccess(actorId, projectId);
   const [row] = await db.select().from(deliverables).where(and(
     eq(deliverables.id, deliverableId), eq(deliverables.projectId, projectId),
     role === "admin" ? undefined : or(ne(deliverables.status, "draft"), eq(deliverables.authorId, actorId)),
@@ -117,7 +118,7 @@ export async function getDeliverableDetail(actorId: string, projectId: string, d
   const versions = await db.select().from(deliverableVersions)
     .where(eq(deliverableVersions.deliverableId, row.id)).orderBy(desc(deliverableVersions.versionNumber));
   const feedback = await db.select().from(deliverableFeedback).where(eq(deliverableFeedback.deliverableId, row.id)).orderBy(desc(deliverableFeedback.createdAt));
-  return { deliverable: view(row, actorId, role), feedback: feedback.map(feedbackView), versions: versions.map(({ submissionKey, ...version }) => {
+  return { deliverable: view(row, actorId, role, project.status === "archived"), feedback: feedback.map(feedbackView), versions: versions.map(({ submissionKey, ...version }) => {
     void submissionKey; return version;
   }) };
 }

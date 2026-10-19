@@ -54,7 +54,7 @@ describe("collaborative document synchronization", () => {
     const provider = makeProvider();
     provider.doc.getMap("content").set("draft", "keep me");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValueOnce(response()));
-    await expect(provider.sync()).rejects.toThrow("Failed to fetch");
+    await expect(provider.sync()).rejects.toThrow("网络连接暂时不可用");
     expect(provider.getSnapshot()).toMatchObject({ status: "offline", pending: true });
     expect(provider.doc.getMap("content").get("draft")).toBe("keep me");
     await provider.flush();

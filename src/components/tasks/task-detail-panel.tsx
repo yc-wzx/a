@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { installUnsavedChangesGuard } from "@/lib/unsaved-changes";
 import type {
   TaskPriorityValue,
   TaskPanelData,
@@ -31,7 +32,7 @@ import { TaskDocumentLinks } from "@/components/documents/task-document-links";
 // 打开/关闭由登录布局中的单例宿主通过 URL 驱动，面板只处理详情与权限。
 //
 // 保存带回载入时拿到的 expectedUpdatedAt，由服务端在事务内锁行比对（定稿 §9.1）；
-// CONFLICT 时如实提示并**自己重取**，绝不假装保存成功。
+// CONFLICT 时保留当前输入；用户明确放弃字段修改后才重新取数。
 
 export type PanelOption = { id: string; name: string };
 
@@ -97,6 +98,18 @@ export function TaskDetailPanel({
   const [nonce, setNonce] = useState(0);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [saving, setSaving] = useState(false);
+  const dirty = useRef(false);
+  const [dirtyFields, setDirtyFields] = useState(false);
+  const childDrafts = useRef<Record<string, boolean>>({});
+  const [formVersion, setFormVersion] = useState<string | null>(null);
+  const [conflicted, setConflicted] = useState(false);
+  const hasDraft = () => dirty.current || Object.values(childDrafts.current).some(Boolean);
+  const discard = () => !hasDraft() || window.confirm("还有未保存的任务修改或未发送内容。确定放弃并离开？取消可继续编辑，再保存或发送。");
+  const close = () => { if (!saving && discard()) { dirty.current = false; childDrafts.current = {}; onClose(); } };
+  const closeLatest = useRef(close);
+  useEffect(() => { closeLatest.current = close; });
+  useEffect(() => installUnsavedChangesGuard(hasDraft, discard, dialogRef.current!), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,12 +156,12 @@ export function TaskDetailPanel({
   const allLabels = ctx?.allLabels ?? [];
   const feedback = ctx?.feedback ?? [];
 
-  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [tab, setTab] = useState<"content" | "outcome">("content");
   const [split, setSplit] = useState(55);
   const splitRef = useRef<HTMLDivElement>(null);
+  if (!dirtyFields && local && formVersion !== local.task.updatedAt) setFormVersion(local.task.updatedAt);
   useEffect(() => {
     const value = Number(localStorage.getItem("agilecampus-task-split"));
     // Restore a presentation preference only; no business data is stored here.
@@ -175,7 +188,7 @@ export function TaskDetailPanel({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || document.querySelector("dialog[open]")) return;
-      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      if (e.key === "Escape") { e.preventDefault(); closeLatest.current(); }
       if (e.key !== "Tab") return;
       const root = dialogRef.current;
       if (!root) return;
@@ -205,7 +218,7 @@ export function TaskDetailPanel({
     try { res = await updateTaskV1Action(projectId, taskId, {
       requestId: newRequestId(),
       // 原样回传服务端给的时间串，绝不在浏览器侧重新生成
-      expectedUpdatedAt: local.task.updatedAt,
+      expectedUpdatedAt: formVersion ?? local.task.updatedAt,
       patch: {
         title: String(form.get("title") ?? "").trim(),
         description: textOrNull(form, "description"),
@@ -224,10 +237,12 @@ export function TaskDetailPanel({
 
     if (!res.ok) {
       setSaveError(res.error);
-      // 版本对不上说明别人先改了：拉一份最新的，别让用户对着旧数据继续改
-      if (res.code === "CONFLICT") refetch();
+      // 冲突保留草稿，暂停提交，避免自动重取覆盖当前输入。
+      if (res.code === "CONFLICT") setConflicted(true);
       return;
     }
+    dirty.current = false; setDirtyFields(false);
+    setConflicted(false);
     setLocal((current) =>
       current ? { ...current, task: res.data.task } : current,
     );
@@ -252,6 +267,7 @@ export function TaskDetailPanel({
       if (res.code === "CONFLICT") refetch();
       return;
     }
+    dirty.current = false; childDrafts.current = {};
     onSaved?.();
     onClose();
   }
@@ -265,20 +281,20 @@ export function TaskDetailPanel({
 
   return (
     <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="任务详情">
-      <button type="button" aria-label="点击遮罩关闭任务" tabIndex={-1} onClick={onClose} className="fixed inset-0 cursor-default bg-ink/40 backdrop-blur-sm" />
+      <button type="button" aria-label="点击遮罩关闭任务" tabIndex={-1} onClick={close} className="fixed inset-0 cursor-default bg-ink/40 backdrop-blur-sm" />
       <div className="relative z-10 flex h-[min(880px,92vh)] w-[min(1200px,96vw)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-pop">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-6 py-4">
           <div className="min-w-0"><p className="text-xs text-ink-faint">任务协作</p><h3 className="truncate font-display text-lg font-semibold text-ink">{task?.title ?? "加载任务…"}</h3></div>
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="关闭" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-faint hover:bg-sunken">✕</button>
+          <button ref={closeRef} type="button" onClick={close} aria-label="关闭" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-faint hover:bg-sunken">✕</button>
         </header>
         {state.error && <div className="p-6"><p role="alert" className="text-sm text-high">{state.error}</p><button onClick={refetch} className="ac-btn-ghost">重试</button></div>}
         {!state.error && !state.data && <p className="p-6 text-sm text-ink-faint">载入任务详情…</p>}
         {task && local && <div ref={splitRef} className="flex min-h-0 flex-1">
           <main className="min-w-0 overflow-y-auto p-6" style={{ width: `${split}%` }}>
             <nav className="mb-5 flex gap-2" aria-label="任务内容切换"><button className={tab === "content" ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab("content")}>任务内容</button><button className={tab === "outcome" ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab("outcome")}>提交成果</button></nav>
-            <div hidden={tab !== "outcome"}><TaskOutcome key={taskId} projectId={projectId} taskId={taskId} title={task.title} canWrite={canWrite && local.allowedActions.edit} onSaved={handleLabelDependencySaved} /></div>
+            <div hidden={tab !== "outcome"}><TaskOutcome key={taskId} projectId={projectId} taskId={taskId} title={task.title} canWrite={canWrite && local.allowedActions.edit} onDirtyChange={value => { childDrafts.current.outcome = value; }} onSaved={handleLabelDependencySaved} /></div>
             <div hidden={tab !== "content"} className="space-y-5">
-              {canWrite && local.allowedActions.edit ? <form key={`fields-${task.updatedAt}`} onSubmit={handleSave} className="space-y-4">
+              {canWrite && local.allowedActions.edit ? <form key={`fields-${formVersion}`} onChange={() => { dirty.current = true; setDirtyFields(true); }} onSubmit={handleSave} className="space-y-4"><fieldset disabled={saving} className="space-y-4">
                 <Field label="标题"><input name="title" defaultValue={task.title} required maxLength={200} className="ac-field text-sm" /></Field>
                 <div className="grid grid-cols-2 gap-3"><Field label="状态"><select name="status" defaultValue={task.status} className="ac-field text-sm"><option value="todo">待办</option><option value="doing">进行中</option><option value="done">已完成</option></select></Field><Field label="截止日"><input type="date" name="dueDate" defaultValue={task.dueDate ?? ""} className="ac-field text-sm" /></Field></div>
                 <MemberPicker members={members} selected={task.assignees?.map(m => m.id) ?? (task.assigneeId ? [task.assigneeId] : [])} />
@@ -289,8 +305,9 @@ export function TaskDetailPanel({
                   <Field label="验收标准"><textarea name="acceptanceCriteria" defaultValue={task.acceptanceCriteria ?? ""} rows={2} className="ac-field text-sm" /></Field><Field label="完成记录"><textarea name="completionNote" defaultValue={task.completionNote ?? ""} rows={2} className="ac-field text-sm" /></Field>
                 </div></details>
                 {saveError && <p role="alert" className="text-sm text-high">{saveError}</p>}
-                <div className="flex justify-end"><button disabled={saving} className="ac-btn">{saving ? "保存中…" : "保存任务"}</button></div>
-              </form> : <div className="space-y-3 text-sm"><p>{STATUS_LABEL[task.status]} · 截止 {task.dueDate ?? "未设置"}</p><p>执行成员：{task.assignees?.map(m => m.name).join("、") || task.assigneeName || "未分配"}</p><p className="whitespace-pre-wrap text-ink-soft">{task.description || "暂无描述"}</p>{task.acceptanceCriteria && <p>验收标准：{task.acceptanceCriteria}</p>}{task.completionNote && <p>完成记录：{task.completionNote}</p>}</div>}
+                {conflicted && <button type="button" className="ac-btn-ghost" onClick={() => { if (window.confirm("重新载入会放弃本次任务字段修改，确定继续？")) { dirty.current = false; setDirtyFields(false); setConflicted(false); refetch(); } }}>放弃字段修改，载入最新版本</button>}
+                <div className="flex justify-end"><button disabled={saving || conflicted} className="ac-btn">{saving ? "保存中…" : "保存任务"}</button></div>
+              </fieldset></form> : <div className="space-y-3 text-sm"><p>{STATUS_LABEL[task.status]} · 截止 {task.dueDate ?? "未设置"}</p><p>执行成员：{task.assignees?.map(m => m.name).join("、") || task.assigneeName || "未分配"}</p><p className="whitespace-pre-wrap text-ink-soft">{task.description || "暂无描述"}</p>{task.acceptanceCriteria && <p>验收标准：{task.acceptanceCriteria}</p>}{task.completionNote && <p>完成记录：{task.completionNote}</p>}</div>}
               <TaskEnhancementSection key={`enhancements-${taskId}`} projectId={projectId} taskId={taskId} onSaved={onSaved} />
               <TaskDocumentLinks key={`docs-${taskId}`} projectId={projectId} taskId={taskId} />
               <p className="text-xs text-ink-faint">子任务 {local.subtaskProgress.doneCount}/{local.subtaskProgress.total} · 依赖 {local.dependencies.length} 条 · {task.iterationId ? "已加入迭代" : "未加入迭代"}</p>
@@ -307,7 +324,7 @@ export function TaskDetailPanel({
             onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); }}
             onPointerMove={e => { if (!e.currentTarget.hasPointerCapture(e.pointerId) || !splitRef.current) return; const bounds = splitRef.current.getBoundingClientRect(); changeSplit((e.clientX - bounds.left) / bounds.width * 100); }}
             onPointerUp={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}><span className="h-12 w-1 rounded-full bg-line group-hover:bg-primary" /></div>
-          <aside className="min-w-0 flex-1 bg-sunken/20 p-5"><TaskCollaboration key={taskId} projectId={projectId} taskId={taskId} /></aside>
+          <aside className="min-w-0 flex-1 bg-sunken/20 p-5"><TaskCollaboration key={taskId} projectId={projectId} taskId={taskId} onDirtyChange={(key, value) => { childDrafts.current[key] = value; }} /></aside>
         </div>}
       </div>
     </div>

@@ -6,7 +6,7 @@ import { DirectorySummary } from "./directory-summary";
 
 export type TeamDirectoryItem = { id: string; name: string; inviteCode: string; role: string; memberCount: number; projectCount: number; activeCount: number };
 const roles: Record<string, string> = { admin: "管理员", teacher: "指导教师", student: "成员" };
-function Invitation({ code }: { code: string }) {
+export function Invitation({ code }: { code: string }) {
   const [copied, setCopied] = useState(false), [error, setError] = useState("");
   return <div className="flex items-center justify-between gap-2 rounded-field border border-line bg-canvas px-3 py-2 text-xs">
     <span className="text-ink-soft">邀请码 <code className="ml-2 select-all text-ink">{code}</code></span>
@@ -28,7 +28,7 @@ export function TeamDirectory({ teams, children }: { teams: TeamDirectoryItem[];
       <section className="space-y-4" aria-label="团队列表">
         <div className="ac-card flex items-center gap-3 p-3"><label className="flex flex-1 items-center gap-2 px-2"><Search size={17} className="text-ink-faint" /><input aria-label="搜索团队" value={query} onChange={e => setQuery(e.target.value)} placeholder="搜索团队名称" className="w-full bg-transparent py-2 text-sm outline-none" /></label><select aria-label="我的团队角色" className="rounded-field border border-line bg-canvas px-3 py-2 text-sm" value={role} onChange={e => setRole(e.target.value)}><option value="all">全部角色</option>{Object.entries(roles).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></div>
         <p role="status" className="text-xs text-ink-soft">显示 {filtered.length} 个团队</p>
-        {filtered.length ? <ul className="space-y-4">{filtered.map(t => <li key={t.id} className="ac-card p-5">
+        {filtered.length ? <ul className="space-y-4">{filtered.map(t => <li key={t.id} id={`team-${t.id}`} className="ac-card p-5">
           <div className="flex items-start gap-3"><span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-lg font-semibold text-primary">{t.name.slice(0, 1)}</span><div className="min-w-0 flex-1"><Link href={`/teams/${t.id}/projects`} className="block truncate font-display text-lg font-semibold hover:text-primary">{t.name}</Link><span className="mt-1 inline-flex items-center gap-1.5 text-xs text-ink-soft">{t.role === "teacher" ? <GraduationCap size={13} /> : <ShieldCheck size={13} />}{roles[t.role]}</span></div><Link aria-label={`进入${t.name}项目`} href={`/teams/${t.id}/projects`} className="ac-btn-ghost text-xs">进入项目<ArrowRight size={14} /></Link></div>
           <div className="my-4 flex items-center gap-6 text-sm"><span><strong className="font-semibold">{t.memberCount}</strong> <span className="text-ink-soft">位成员</span></span><span><strong className="font-semibold">{t.projectCount}</strong> <span className="text-ink-soft">个项目</span></span><span className="text-xs text-ink-faint">{t.activeCount} 个进行中</span></div>
           <Invitation code={t.inviteCode} />

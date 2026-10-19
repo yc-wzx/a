@@ -1,3 +1,4 @@
+export const metadata = { title: "通知 · AgileCampus" };
 import { randomUUID } from "node:crypto";
 import { TaskLink as Link } from "@/components/tasks/task-link";
 import { redirect } from "next/navigation";

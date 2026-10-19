@@ -1,3 +1,4 @@
+export const metadata = { title: "我的团队 · AgileCampus" };
 import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";

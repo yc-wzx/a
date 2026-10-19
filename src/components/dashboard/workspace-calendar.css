@@ -3,3 +3,7 @@
 @media(max-width:800px){.wc-layout{grid-template-columns:minmax(0,1fr)}.wc-sidebar{border-left:0;padding-left:0;display:grid;grid-template-columns:180px minmax(0,1fr);gap:18px}.wc-day-summary{margin:0;padding:0;border:0}.wc-management{grid-column:1/-1}.wc-heading{flex-wrap:wrap}.wc-source-options{gap:10px}.wc-agenda section{grid-template-columns:100px 1fr}}
 
 .wc-week-scroll{max-height:650px;overflow:auto;scroll-padding-top:150px}.wc-week-head{height:76px;position:sticky;top:0;z-index:4}.wc-date-row{position:sticky;top:76px;z-index:3;background:white}.wc-overdue{background:#fcf0ec;border-color:#ca8972;color:#a25f48}
+
+.wc-range-row{display:grid;grid-template-columns:48px minmax(0,1fr);border-bottom:1px solid #e4eaf0;background:#fff}.wc-range-row .wc-axis-label{padding:8px 2px}.wc-range-bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:5px 0;min-height:32px}.wc-range-bars>div{min-width:0;padding:0 3px}.wc-range-bars .wc-entry{padding:4px 8px;font-size:11px;white-space:nowrap;overflow:hidden}.wc-range-bars .wc-entry-title{overflow:hidden;text-overflow:ellipsis}
+
+.wc-month-week>.wc-range-bars:empty{display:none}

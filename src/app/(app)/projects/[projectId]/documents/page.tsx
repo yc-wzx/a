@@ -1,3 +1,4 @@
+export const metadata = { title: "项目文档 · AgileCampus" };
 import { auth } from "@/lib/auth";
 import { listDocuments, getDocumentKnowledge } from "@/lib/documents";
 import { getProjectForUser } from "@/lib/project";

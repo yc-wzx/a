@@ -1,3 +1,4 @@
+export const metadata = { title: "项目迭代 · AgileCampus" };
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { auth } from "@/lib/auth";

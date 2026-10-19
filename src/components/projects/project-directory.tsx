@@ -21,7 +21,7 @@ export function ProjectDirectory({ projects }: { projects: ProjectDirectoryItem[
   return <main className="space-y-6 py-6" data-project-directory>
     <header className="flex items-start justify-between gap-6">
       <div><p className="mb-2 text-sm text-primary">课程协作</p><h1 className="font-display text-3xl font-semibold">所有项目</h1><p className="mt-2 text-sm text-ink-soft">集中查看各团队项目，继续任务、整理文档与提交成果。</p></div>
-      <Link className="ac-btn-ghost" href="/teams"><Users size={16} />团队项目管理<ArrowRight size={15} /></Link>
+      <div className="flex shrink-0 gap-2"><Link className="ac-btn" href="/projects/new">创建项目</Link><Link className="ac-btn-ghost" href="/teams"><Users size={16} />团队管理</Link></div>
     </header>
     <DirectorySummary items={[
       { label: "参与项目", value: projects.length, icon: FolderKanban, detail: "当前账号可访问的项目" },
@@ -46,7 +46,7 @@ export function ProjectDirectory({ projects }: { projects: ProjectDirectoryItem[
           <div className="flex items-start justify-between gap-3"><span aria-hidden className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-lg font-semibold text-primary">{p.name.slice(0, 1)}</span><span className={`ac-badge ${p.status === "archived" ? "bg-sunken text-ink-soft" : "bg-done/12 text-done"}`}>{p.status === "archived" ? "已归档" : "进行中"}</span></div>
           <Link href={`/projects/${p.id}/overview`} className="mt-4 block truncate font-display text-lg font-semibold hover:text-primary">{p.name}</Link>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-soft"><Users size={13} />{p.teamName}</p>
-          <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-ink-soft">{p.description || "尚未填写项目说明，可在项目概览完善目标与范围。"}</p>
+          <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-ink-soft">{p.description || "尚未填写项目说明，团队管理员可在项目设置中完善。"}</p>
           <div className="mt-5 flex justify-between text-xs"><span className="text-ink-soft">任务完成 {p.doneCount} / {p.taskTotal}</span><span className="tabular-nums text-primary">{p.taskTotal ? `${percent}%` : "暂无任务"}</span></div>
           <div role="progressbar" aria-label={`${p.name}任务完成进度`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunken"><div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} /></div>
           <div className="mt-3 flex items-center justify-between text-xs text-ink-faint"><span>进行中任务 {p.doingCount}</span><span className="inline-flex items-center gap-1"><CalendarDays size={12} />{p.endDate ? `结束 ${p.endDate}` : "未设置结束日期"}</span></div>

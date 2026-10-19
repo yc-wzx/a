@@ -69,8 +69,8 @@ describe("deriveSetupSteps", () => {
     expect(result).toHaveLength(5);
     expect(result.every((item) => !item.done)).toBe(true);
 
-    // 项目简介目前没有编辑入口 → 不给 href，避免放假链接
-    expect(step(result, "goal").href).toBeUndefined();
+    // 项目设置现已接入，可前往真实入口完善简介。
+    expect(step(result, "goal").href).toBe(`/projects/${PROJECT_ID}/settings`);
     expect(step(result, "milestone").href).toBe(`/projects/${PROJECT_ID}`);
     expect(step(result, "task").href).toBe(`/projects/${PROJECT_ID}`);
     expect(step(result, "members").href).toBe(`/teams/${TEAM_ID}/members`);

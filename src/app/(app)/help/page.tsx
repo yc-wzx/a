@@ -1,3 +1,4 @@
+export const metadata = { title: "使用教程 · AgileCampus" };
 import Link from "next/link";
 import { ArrowRight, BookOpen, CheckCircle2 } from "lucide-react";
 import { QuickstartTour } from "@/components/quickstart-tour";

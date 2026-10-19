@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ArrowLeft,
   FileText,
+  Settings2,
 } from "lucide-react";
 import { CalendarDownload } from "@/app/(app)/projects/[projectId]/extras/calendar-download";
 import {
@@ -68,7 +69,7 @@ export function ProjectSidebar({
     return group.collapsible ? (
       <details
         key={`${group.label}:${current}`}
-        open={group.items.some((item) => item.key === current)}
+        open
         className="group border-t border-line pt-3"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between px-3 text-xs font-medium text-ink-faint">
@@ -107,6 +108,7 @@ export function ProjectSidebar({
         {groups}
       </nav>
       <div className="mt-5 border-t border-line pt-3">
+        <Link href={`/projects/${projectId}/settings`} aria-current={pathname.endsWith("/settings") ? "page" : undefined} className="mb-3 flex items-center gap-2 px-3 py-2 text-sm text-ink-soft hover:text-primary"><Settings2 size={16} aria-hidden />项目设置</Link>
         <CalendarDownload projectId={projectId} />
       </div>
     </aside>

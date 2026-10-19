@@ -17,9 +17,12 @@ type Loaded = Extract<
 export function TaskComments({
   projectId,
   taskId,
+  onDirtyChange, refreshVersion = 0,
 }: {
   projectId: string;
   taskId: string;
+  onDirtyChange?: (dirty: boolean) => void;
+  refreshVersion?: number;
 }) {
   const search = useSearchParams(),
     focus = search.get("comment") ?? undefined;
@@ -30,6 +33,7 @@ export function TaskComments({
   const [body, setBody] = useState(""),
     [mentioned, setMentioned] = useState<string[]>([]),
     [editing, setEditing] = useState<string | null>(null);
+  useEffect(() => { onDirtyChange?.(!!body.trim()); }, [body, onDirtyChange]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [requestId, setRequestId] = useState(newRequestId),
@@ -59,7 +63,7 @@ export function TaskComments({
     return () => {
       active = false;
     };
-  }, [projectId, taskId, offset, focus]);
+  }, [projectId, taskId, offset, focus, refreshVersion]);
   useEffect(() => {
     if (data && focus)
       document

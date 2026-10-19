@@ -1,8 +1,10 @@
+export const metadata = { title: "教师项目总览 · AgileCampus" };
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { listTeacherProjectOverview } from "@/lib/workspace-summary";
 import { TeacherProjectCard } from "@/components/projects/teacher-project-card";
+import { RefreshButton } from "@/components/refresh-button";
 export default async function Page({
   searchParams,
 }: {
@@ -22,7 +24,7 @@ export default async function Page({
     `/teacher?offset=${n}&archived=${includeArchived}`;
   return (
     <main className="mx-auto max-w-5xl space-y-5 py-8 [overflow-wrap:anywhere]">
-      <h1 className="font-display text-2xl font-semibold">教师项目总览</h1>
+      <div className="flex items-center justify-between"><h1 className="font-display text-2xl font-semibold">教师项目总览</h1><RefreshButton /></div>
       <Link
         href={`/teacher?archived=${!includeArchived}`}
         className="text-sm text-primary underline"

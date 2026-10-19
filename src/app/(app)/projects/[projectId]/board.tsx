@@ -4,10 +4,13 @@ import { useOptimistic, useState, useTransition } from "react";
 import {
   DndContext,
   PointerSensor,
+  KeyboardSensor,
+  closestCenter,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type KeyboardCoordinateGetter,
 } from "@dnd-kit/core";
 import {
   deriveColumns,
@@ -17,6 +20,17 @@ import {
 import type { GroupBy } from "@/lib/board-filters";
 import { moveTaskAction } from "./actions";
 import { TaskCard, type Option } from "./task-card";
+
+const columnCoordinates: KeyboardCoordinateGetter = (event, { currentCoordinates, context }) => {
+  if (!["ArrowLeft", "ArrowRight"].includes(event.code)) return;
+  event.preventDefault();
+  const columns = [...context.droppableRects.entries()].sort((a, b) => a[1].left - b[1].left);
+  const index = columns.findIndex(([id]) => id === context.over?.id);
+  const target = columns[index + (event.code === "ArrowLeft" ? -1 : 1)];
+  const current = context.collisionRect;
+  if (!target || !current) return currentCoordinates;
+  return { x: currentCoordinates.x + target[1].left - current.left + 12, y: currentCoordinates.y + target[1].top - current.top + 42 };
+};
 
 export type BoardTask = {
   assignees?: { id: string; name: string }[];
@@ -42,6 +56,7 @@ function Column({
   allTasks,
   dependencies,
   onOpenTask,
+  columns, onMove, doingLimit,
 }: {
   column: BoardColumn;
   tasks: BoardTask[];
@@ -49,6 +64,8 @@ function Column({
   allTasks: { id: string; title: string }[];
   dependencies: { predecessorId: string; successorId: string }[];
   onOpenTask: (taskId: string) => void;
+  columns: BoardColumn[]; onMove: (taskId: string, columnKey: string) => void;
+  doingLimit?: { doingLimit: number | null; doingCount: number; exceeded: boolean };
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.key });
 
@@ -67,6 +84,7 @@ function Column({
           {tasks.length}
         </span>
       </h3>
+      {column.key === "doing" && doingLimit?.doingLimit != null && <p className={`text-xs ${doingLimit.exceeded ? "text-high" : "text-ink-soft"}`}>全项目主任务 {doingLimit.doingCount} / 建议 {doingLimit.doingLimit}{doingLimit.exceeded ? " · 已超出建议数量" : ""}</p>}
       {tasks.map((t) => (
         <TaskCard
           key={t.id}
@@ -75,6 +93,7 @@ function Column({
           allTasks={allTasks}
           dependencies={dependencies}
           onOpen={() => onOpenTask(t.id)}
+          columns={columns} onMove={onMove}
         />
       ))}
     </div>
@@ -91,6 +110,7 @@ export function Board({
   allTasks,
   dependencies,
   onOpenTask,
+  doingLimit,
 }: {
   projectId: string;
   tasks: BoardTask[];
@@ -101,6 +121,7 @@ export function Board({
   allTasks: { id: string; title: string }[];
   dependencies: { predecessorId: string; successorId: string }[];
   onOpenTask: (taskId: string) => void;
+  doingLimit?: { doingLimit: number | null; doingCount: number; exceeded: boolean };
 }) {
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -111,13 +132,13 @@ export function Board({
   );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: columnCoordinates }),
   );
 
   const columns = deriveColumns(groupBy, { members, milestones });
 
-  function handleDragEnd(event: DragEndEvent) {
-    const taskId = String(event.active.id);
-    const over = event.over?.id;
+  function handleDragEnd(event: DragEndEvent) { move(String(event.active.id), event.over ? String(event.over.id) : ""); }
+  function move(taskId: string, over: string) {
     if (!over) return;
     const column = columns.find((c) => c.key === String(over));
     const task = optimisticTasks.find((t) => t.id === taskId);
@@ -127,12 +148,12 @@ export function Board({
     startTransition(async () => {
       setError(null);
       moveOptimistic({ taskId, patch: column.patch });
-      const res = await moveTaskAction({
+      try { const res = await moveTaskAction({
         taskId,
         projectId,
         patch: column.patch,
       });
-      if (res?.error) setError(res.error);
+      if (res?.error) setError(res.error); } catch { setError("移动结果未确认，请刷新核对后重试"); }
     });
   }
 
@@ -140,10 +161,12 @@ export function Board({
     <DndContext
       id={`board-${projectId}`}
       sensors={sensors}
+      collisionDetection={closestCenter}
+      accessibility={{ screenReaderInstructions: { draggable: "按空格开始拖动，左右方向键选择目标列，再按空格放下；Esc 取消。也可以使用卡片的移动至菜单。" } }}
       onDragEnd={handleDragEnd}
     >
       {error && <p className="text-sm text-high">{error}</p>}
-      {/* 列数随分组维度而变，故横向滚动而非固定三栏 */}
+      {canWrite && <p className="mb-2 text-xs text-ink-soft">使用卡片右上角把手拖动，或通过“移动至”菜单调整分组。把手支持空格和左右方向键。</p>}
       <div className="flex gap-4 overflow-x-auto pb-2">
         {columns.map((col) => (
           <Column
@@ -154,6 +177,7 @@ export function Board({
             allTasks={allTasks}
             dependencies={dependencies}
             onOpenTask={onOpenTask}
+            columns={columns} onMove={move} doingLimit={groupBy === "status" ? doingLimit : undefined}
           />
         ))}
       </div>

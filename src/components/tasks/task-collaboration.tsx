@@ -5,13 +5,14 @@ import { readCollaborationAction, sendDiscussionAction, collaborationAction } fr
 import { createTaskCommentAction } from "@/app/(app)/projects/[projectId]/tasks/comments/actions";
 import { newRequestId } from "@/lib/request-id";
 type Data = Extract<Awaited<ReturnType<typeof readCollaborationAction>>, { ok: true }>["data"];
-export function TaskCollaboration({ projectId, taskId }: { projectId: string; taskId: string }) {
+export function TaskCollaboration({ projectId, taskId, onDirtyChange }: { projectId: string; taskId: string; onDirtyChange?: (key: string, dirty: boolean) => void }) {
   const [tab, setTab] = useState<"team" | "discussion">("team");
   const [data, setData] = useState<Data | null>(null), [error, setError] = useState("");
   const [body, setBody] = useState(""), [replyTo, setReplyTo] = useState<string | null>(null), [mentions, setMentions] = useState<string[]>([]);
   const [pending, setPending] = useState(false), [older, setOlder] = useState<Data["messages"]>([]);
   const [conclusion, setConclusion] = useState<string | null>(null), [publicVersion, setPublicVersion] = useState(0);
   const request = useRef(newRequestId()), conclusionRequest = useRef(newRequestId());
+  useEffect(() => { onDirtyChange?.("discussion", !!body.trim() || !!conclusion?.trim()); }, [body, conclusion, onDirtyChange]);
   const scroll = useRef<HTMLDivElement>(null), atBottom = useRef(true), lastCount = useRef(0);
   const [newCount, setNewCount] = useState(0);
   const refresh = useCallback(async () => {
@@ -48,7 +49,7 @@ export function TaskCollaboration({ projectId, taskId }: { projectId: string; ta
     {error && <p role="alert" className="py-2 text-sm text-high">{error} <button onClick={() => void refresh()}>重连</button></p>}
     <div hidden={tab !== "team"} className="min-h-0 flex-1 overflow-y-auto pt-2">
       <p className="text-xs text-ink-faint">全队可见 · 老师和非执行成员也可参与</p>
-      <TaskComments key={publicVersion} projectId={projectId} taskId={taskId} />
+      <TaskComments refreshVersion={publicVersion} projectId={projectId} taskId={taskId} onDirtyChange={value => onDirtyChange?.("comments", value)} />
     </div>
     {tab === "discussion" && (!data ? <p className="p-4 text-sm">正在核对讨论权限…</p> : !data.canDiscuss ? <div className="my-5 rounded-xl bg-sunken p-5 text-sm"><strong>仅任务讨论成员可见</strong><p className="mt-2">你可以在“团队评论”中交流，或请任务发起人邀请你加入讨论。</p></div> : <>
       <div className="py-3 text-xs text-ink-soft">仅 {data.participants.map(m => m.name).join("、")} 可见</div>
@@ -66,7 +67,7 @@ export function TaskCollaboration({ projectId, taskId }: { projectId: string; ta
       {newCount > 0 && <button className="py-1 text-xs text-primary" onClick={() => { atBottom.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight }); setNewCount(0); }}>有新消息 · 查看最新</button>}
       {data.canWrite ? <div className="space-y-2 pt-3">
         {replyTo && <p className="text-xs">回复已选消息 <button onClick={() => setReplyTo(null)}>取消</button></p>}
-        <textarea aria-label="任务讨论消息" className="ac-field w-full" rows={3} maxLength={10000} placeholder="与执行成员协商；内容不会自动公开" value={body} onChange={e => { setBody(e.target.value); request.current = newRequestId(); }} />
+        <textarea disabled={pending} aria-label="任务讨论消息" className="ac-field w-full" rows={3} maxLength={10000} placeholder="与执行成员协商；内容不会自动公开" value={body} onChange={e => { setBody(e.target.value); request.current = newRequestId(); }} />
         <details><summary className="cursor-pointer text-xs text-ink-faint">@ 讨论成员 / 管理成员</summary><div className="my-2 flex flex-wrap gap-3">{data.participants.filter(m => m.id !== data.actorId).map(m => <label key={m.id} className="text-xs"><input type="checkbox" checked={mentions.includes(m.id)} onChange={e => { setMentions(a => e.target.checked ? [...a, m.id] : a.filter(id => id !== m.id)); request.current = newRequestId(); }} /> {m.name}</label>)}</div>{data.canManageDiscussion && <div className="my-2 space-y-1">{data.invitedUserIds.map(id => <p key={id} className="text-xs">{data.members.find(m => m.id === id)?.name} <button type="button" className="text-high" onClick={async () => { const r = await collaborationAction(projectId, taskId, { op: "invite", userId: id, enabled: false }); if (!r.ok) setError(r.error); await refresh(); }}>移出讨论</button></p>)}</div>}<select disabled={!data.canManageDiscussion} aria-label="邀请讨论成员" className="ac-field text-xs" defaultValue="" onChange={async e => { if (!e.target.value) return; const r = await collaborationAction(projectId, taskId, { op: "invite", userId: e.target.value, enabled: true }); if (!r.ok) setError(r.error); await refresh(); }}><option value="">发起人可邀请团队成员…</option>{data.members.filter(m => !data.participants.some(p => p.id === m.id)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></details>
         <div className="flex items-center justify-between gap-2"><button className="text-xs text-primary" onClick={() => { conclusionRequest.current = newRequestId(); setConclusion(""); }}>向全队发布结论</button><button className="ac-btn" disabled={pending || !body.trim()} onClick={() => void send()}>{pending ? "发送中…" : "发送"}</button></div>
       </div> : <p className="py-3 text-xs text-ink-faint">项目已归档，仅可查看讨论历史。</p>}
