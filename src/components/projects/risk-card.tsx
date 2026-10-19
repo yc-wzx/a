@@ -14,7 +14,7 @@ export const RISK_RULE_LABELS: Record<RiskItem["ruleId"], string> = {
 };
 
 function pairs(record: Record<string, number | string>): string {
-  const labels: Record<string, string> = { today: "今天", dueDate: "截止日", calendarDays: "日历天数", remainingRatio: "剩余时间比例", doneRatio: "完成比例", taskTotal: "主任务数", hours: "小时数" };
+  const labels: Record<string, string> = { daysOverdue: "逾期天数", overdueCount: "逾期任务数", today: "今天", dueDate: "截止日", calendarDays: "日历天数", remainingRatio: "剩余时间比例", doneRatio: "完成比例", taskTotal: "主任务数", hours: "小时数" };
   const entries = Object.entries(record);
   if (entries.length === 0) return "—";
   return entries.map(([key, value]) => `${labels[key] ?? key}：${typeof value === "number" && key.endsWith("Ratio") ? `${Math.round(value * 100)}%` : typeof value === "number" ? Math.round(value * 10) / 10 : value}`).join("，");
