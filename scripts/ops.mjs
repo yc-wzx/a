@@ -138,7 +138,7 @@ async function backup() {
   const [code] = await complete;
   if (code !== 0) throw Error("Backup failed; do not use the partial dump");
   const attachmentFile = filename + ".attachments.tar";
-  const files = spawn("docker", [...prefix,"exec","-T","app","sh","-c","if [ -d /app/storage/attachments ]; then tar -C /app/storage/attachments -cf - .; else tar -cf - -T /dev/null; fi"], {cwd:root,stdio:["ignore","pipe","inherit"]});
+  const files = spawn("docker", [...prefix,"exec","-T","app","sh","-c",'set -e; if [ -d /app/storage/attachments ]; then tar -C /app/storage/attachments -cf - .; else empty=$(mktemp -d); tar -C "$empty" -cf - .; rmdir "$empty"; fi'], {cwd:root,stdio:["ignore","pipe","inherit"]});
   const filesComplete = once(files,"close");
   await pipeline(files.stdout,fs.createWriteStream(attachmentFile,{flags:"wx",mode:0o600}));
   const [filesCode] = await filesComplete;
