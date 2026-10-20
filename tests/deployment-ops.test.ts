@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
     mkdirSync: vi.fn(),
     statSync: vi.fn(),
     createWriteStream: vi.fn(),
+    openSync: vi.fn(),
+    readSync: vi.fn(),
+    closeSync: vi.fn(),
   },
   spawn: vi.fn(),
   spawnSync: vi.fn(),
@@ -64,6 +67,16 @@ beforeEach(() => {
     writes.set(file, data),
   );
   mocks.fs.statSync.mockReturnValue({ size: 22 });
+  let offset = 0;
+  mocks.fs.openSync.mockImplementation(() => { offset = 0; return 10; });
+  mocks.fs.readSync.mockImplementation((_fd: number, buffer: Buffer) => {
+    const bytes = Buffer.from("synthetic backup bytes");
+    if (offset) return 0;
+    offset = bytes.length;
+    bytes.copy(buffer);
+    return bytes.length;
+  });
+  mocks.fs.closeSync.mockImplementation(() => {});
   mocks.fs.createWriteStream.mockImplementation(
     () =>
       new Writable({
@@ -135,6 +148,9 @@ describe("production operations orchestration (Docker processes simulated)", () 
     );
     expect(recordedRelease()).toMatchObject({ image: currentTag, migrationImage: migrationTag });
     expect(calls.find(([, args]) => args.includes("edge"))?.[1]).toContain("--force-recreate");
+    expect(mocks.spawn.mock.calls.some(([, args]) => args.includes("app") && args.includes("sh"))).toBe(true);
+    const manifest = [...writes].find(([file]) => file.endsWith(".dump.json"));
+    expect(JSON.parse(manifest![1]).attachments).toMatchObject({sizeBytes:22,sha256:expect.any(String)});
   });
 
   it.each(["missing app", "mismatched migration"])(
@@ -200,6 +216,19 @@ describe("production operations orchestration (Docker processes simulated)", () 
     ).toBe(false);
     expect(mocks.spawn).not.toHaveBeenCalled();
     expect(writes.size).toBe(0);
+  });
+
+  it("does not stop or migrate the application when the paired attachment backup fails", async () => {
+    mocks.spawn.mockImplementation((_binary: string, args: string[]) => {
+      const child = new EventEmitter() as EventEmitter & { stdout: Readable };
+      child.stdout = Readable.from([Buffer.from("synthetic backup bytes")]);
+      setImmediate(() => child.emit("close", args.includes("app") ? 1 : 0));
+      return child;
+    });
+    await execute("release");
+    expect(process.exitCode).toBe(1);
+    expect(mocks.spawnSync.mock.calls.some(([,args]) => args.includes("stop") || args.includes("migrate") && args.includes("run"))).toBe(false);
+    expect([...writes.keys()].some(file => file.endsWith(".release.json") || file.endsWith(".dump.json"))).toBe(false);
   });
 
   it("rolls back only app/reminders without rebuilding or migrating, and records the running version", async () => {

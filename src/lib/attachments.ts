@@ -12,7 +12,7 @@ import { AppError, ConflictError, ForbiddenError, ValidationError } from "./erro
 export const attachmentTargetSchema = z.object({ projectId: z.uuid(), targetType: z.enum(["project","task","document","deliverable"]), targetId: z.uuid() });
 export type AttachmentTarget = z.infer<typeof attachmentTargetSchema>;
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
-const root = () => path.resolve(/* turbopackIgnore: true */ process.env.ATTACHMENT_STORAGE_DIR ?? path.join(process.cwd(), ".data", "attachments"));
+const root = () => process.env.ATTACHMENT_STORAGE_DIR ?? path.join(process.cwd(), ".data", "attachments");
 function filePath(key: string) { if (!/^[a-f0-9-]{36}$/.test(key)) throw new ValidationError("文件标识无效"); return path.join(/* turbopackIgnore: true */ root(), key); }
 export function safeAttachmentName(name: string) { return name.replace(/[\x00-\x1f\x7f/\\]/g,"_").slice(0,180).trim() || "附件"; }
 export function detectAttachmentType(name: string, body: Buffer): string {
@@ -134,7 +134,7 @@ export async function cleanupAttachmentFiles() {
   const expired = await db.select().from(attachments).where(lt(attachments.deletedAt,new Date(Date.now()-3600000)));
   for(const row of expired){await unlink(filePath(row.storageKey)).catch(error=>{if(error.code!=="ENOENT")throw error;});await db.delete(attachments).where(and(eq(attachments.id,row.id),lt(attachments.deletedAt,new Date(Date.now()-3600000))));}
   const keys = new Set((await db.select({ key: attachments.storageKey }).from(attachments)).map(x => x.key));
-  const names = await readdir(root()).catch(() => []); let removed = 0;
+  const names = await readdir(/* turbopackIgnore: true */ root()).catch(() => []); let removed = 0;
   for (const name of names) {
     if (!/^[a-f0-9-]{36}$/.test(name) || keys.has(name)) continue;
     const marker=filePath(name)+".orphan";
