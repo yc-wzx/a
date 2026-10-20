@@ -4,9 +4,12 @@ import { TaskComments } from "@/components/task-comments";
 import { readCollaborationAction, sendDiscussionAction, collaborationAction } from "@/app/(app)/projects/[projectId]/tasks/collaboration-actions";
 import { createTaskCommentAction } from "@/app/(app)/projects/[projectId]/tasks/comments/actions";
 import { newRequestId } from "@/lib/request-id";
+import { SourceTaskButton } from "./source-task";
+import { useSearchParams } from "next/navigation";
 type Data = Extract<Awaited<ReturnType<typeof readCollaborationAction>>, { ok: true }>["data"];
 export function TaskCollaboration({ projectId, taskId, onDirtyChange }: { projectId: string; taskId: string; onDirtyChange?: (key: string, dirty: boolean) => void }) {
-  const [tab, setTab] = useState<"team" | "discussion">("team");
+  const search = useSearchParams(), focusDiscussion = search.get("discussion");
+  const [tab, setTab] = useState<"team" | "discussion">(focusDiscussion ? "discussion" : "team");
   const [data, setData] = useState<Data | null>(null), [error, setError] = useState("");
   const [body, setBody] = useState(""), [replyTo, setReplyTo] = useState<string | null>(null), [mentions, setMentions] = useState<string[]>([]);
   const [pending, setPending] = useState(false), [older, setOlder] = useState<Data["messages"]>([]);
@@ -58,7 +61,8 @@ export function TaskCollaboration({ projectId, taskId, onDirtyChange }: { projec
         {[...older, ...data.messages].filter((v, i, a) => a.findIndex(m => m.id === v.id) === i).map(m => <article key={m.id} className="rounded-lg border border-line bg-surface p-3">
           <p className="text-xs text-ink-faint">{m.authorName} · {new Date(m.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</p>
           {m.replyToId && <p className="mt-1 border-l-2 border-line pl-2 text-xs text-ink-faint">回复：{[...older, ...data.messages].find(x => x.id === m.replyToId)?.body.slice(0, 80) ?? "较早的讨论消息"}</p>}
-          <p className="my-2 whitespace-pre-wrap break-words text-sm">{m.body}</p>
+          <p id={`discussion-${m.id}`} className="my-2 whitespace-pre-wrap break-words text-sm">{m.body}</p>
+          {data.canWrite && <SourceTaskButton projectId={projectId} sourceType="discussion" sourceId={m.id} revision={m.createdAt} text={m.body} />}
           {m.mentionedUserIds.length > 0 && <p className="text-xs text-primary">{m.mentionedUserIds.map(id => "@" + (data.participants.find(p => p.id === id)?.name ?? "原成员")).join(" ")}</p>}
           <div className="flex gap-3 text-xs text-ink-soft"><button disabled={!data.canWrite} onClick={() => setReplyTo(m.id)}>回复</button><button disabled={!data.canWrite} onClick={async () => { const r = await collaborationAction(projectId, taskId, { op: "react", channel: "discussion", messageId: m.id, enabled: !data.reactions.some(x => x.messageId === m.id && x.userId === data.actorId) }); if (!r.ok) setError(r.error); await refresh(); }}>收到 {data.reactions.filter(r => r.messageId === m.id).length || ""}</button></div>
         </article>)}

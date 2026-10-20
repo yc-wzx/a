@@ -16,6 +16,7 @@ import { LocateTarget } from "../locate";
 import { ReviewForm } from "../review-form";
 import { StartRevisionButton } from "../start-revision-button";
 import { FeedbackTaskForm } from "../feedback-task-form";
+import { ProjectAttachments } from "@/components/attachments/project-attachments";
 
 /** D 的审核决定翻译成中文；里程碑文字反馈没有版本。 */
 const DECISION_LABELS: Record<string, string> = {
@@ -123,6 +124,7 @@ export default async function DeliverablePage({
   return (
     <main className="mx-auto max-w-3xl space-y-5 py-8">
       <ProjectNav projectId={projectId} current="deliverables" />
+      {!item.allowedActions.edit && <ProjectAttachments projectId={projectId} targetType="deliverable" targetId={deliverableId} canUpload={false} />}
       {detail.versions.length > 0 && (
         <Link
           href={`/projects/${projectId}/deliverables/${deliverableId}/compare`}

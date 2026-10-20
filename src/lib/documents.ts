@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, gt, isNull, isNotNull, or, sql, count, inArray } from "drizzle-orm";
 import { z } from "zod";
 import * as Y from "yjs";
@@ -6,9 +6,10 @@ import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import { generateText } from "ai";
 import { db, type DbTx } from "@/db";
-import { tasks, teamMembers, users, projects } from "@/db/schema";
+import { tasks, teamMembers, users, projects, notifications } from "@/db/schema";
+import { documentConfirmationRounds as confirmationRounds, documentConfirmations as confirmations } from "@/db/document-workflow-schema";
 import { projectDocuments as documents, documentGrants as grants, documentVersions as versions, documentComments as comments, documentTaskLinks as links, documentPresence as presence, documentAiRequests as aiRequests } from "@/db/documents-schema";
-import type { DocumentDetail, DocumentList, DocumentNode, DocumentPermission, DocumentSummary, DocumentSyncResult, DocumentVersion } from "@/contracts/documents";
+import type { DocumentConfirmation, DocumentDetail, DocumentList, DocumentNode, DocumentPermission, DocumentSummary, DocumentSyncResult, DocumentVersion } from "@/contracts/documents";
 import { ForbiddenError, ConflictError, ValidationError } from "./errors";
 import { claimWriteRequest, finishWriteRequest, hashRequest } from "./write-request";
 import { contentToYState, decodeDocumentBinary, documentBlockExists, documentMarkdown, documentText, EMPTY_DOCUMENT, readYState, validateDocumentContent, yDocumentContent } from "./documents-content";
@@ -77,6 +78,83 @@ async function saveVersion(context: Context, row: Row, label: string, kind: Docu
 function withBlockIds(node: DocumentNode): DocumentNode {
   const block = ["paragraph", "heading", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary"].includes(node.type);
   return { ...node, ...(block ? { attrs: { ...node.attrs, id: node.attrs?.id ?? randomUUID() } } : {}), ...(node.content ? { content: node.content.map(withBlockIds) } : {}) };
+}
+
+function bodyHash(content: DocumentNode) { return createHash("sha256").update(JSON.stringify(content)).digest("hex"); }
+async function readableDocumentMembers(context: Context, row: Row) {
+  const members = await context.tx.select({ id: users.id, name: users.name, role: teamMembers.role, grant: grants.permission })
+    .from(teamMembers).innerJoin(users, eq(users.id, teamMembers.userId))
+    .leftJoin(grants, and(eq(grants.documentId, row.id), eq(grants.userId, users.id)))
+    .where(eq(teamMembers.teamId, context.teamId)).for("share", { of: [teamMembers] });
+  return members.filter(member => actorPermission(row, member.id, member.role, member.grant ?? undefined));
+}
+async function documentNotification(context: Context, row: Row, type: string, eventKey: string, recipients: string[], extra: { commentId?: string } = {}) {
+  const allowed = await readableDocumentMembers(context, row);
+  const selected = allowed.filter(member => member.id !== context.actorId && recipients.includes(member.id));
+  if (!selected.length) return;
+  const titles: Record<string, string> = { "document.comment": "文档收到评论", "document.reply": "文档评论收到回复", "document.confirmation_requested": "文档待你确认", "document.confirmation_stale": "文档更新，需重新确认", "document.confirmed": "文档已确认" };
+  const href = `/projects/${row.projectId}/documents/${row.id}${extra.commentId ? `#comment-${extra.commentId}` : "#document-confirmation"}`;
+  // In-app only: private document excerpts must never enter external channels.
+  await context.tx.insert(notifications).values(selected.map(member => ({ eventKey, recipientId: member.id, projectId: row.projectId,
+    type, title: titles[type], summary: `${context.actorName} · ${row.title}`, sourceType: "activity", sourceId: extra.commentId ?? row.id, href,
+    metadata: { documentId: row.id, ...extra }, channel: "in_app" }))).onConflictDoNothing();
+}
+async function invalidateDocumentConfirmation(context: Context, row: Row, content: DocumentNode, nextEpoch = row.epoch) {
+  if (row.epoch === nextEpoch && bodyHash(row.content) === bodyHash(content)) return;
+  const rounds = await context.tx.update(confirmationRounds).set({ invalidatedAt: new Date() })
+    .where(and(eq(confirmationRounds.documentId, row.id), isNull(confirmationRounds.invalidatedAt))).returning({ id: confirmationRounds.id });
+  for (const round of rounds) {
+    const people = await context.tx.select({ id: confirmations.userId }).from(confirmations).where(eq(confirmations.roundId, round.id));
+    await documentNotification(context, row, "document.confirmation_stale", `document.confirmation-stale:${round.id}`, people.map(person => person.id));
+  }
+}
+
+export async function getDocumentConfirmation(actorId: string, projectId: string, documentId: string): Promise<DocumentConfirmation> {
+  return projectContext(actorId, projectId, async context => {
+    const item = await access(context, documentId);
+    if (item.row.deletedAt) throw new ForbiddenError("文档已移入回收站");
+    const members = await readableDocumentMembers(context, item.row);
+    const [round] = await context.tx.select().from(confirmationRounds).where(eq(confirmationRounds.documentId, documentId)).orderBy(desc(confirmationRounds.createdAt), desc(confirmationRounds.id)).limit(1);
+    const rows = round ? await context.tx.select().from(confirmations).where(eq(confirmations.roundId, round.id)) : [];
+    const stale = !!round && (!!round.invalidatedAt || round.epoch !== item.row.epoch || round.bodyHash !== bodyHash(item.row.content));
+    return { round: round ? { id: round.id, epoch: round.epoch, revision: round.revision, requestedAt: round.createdAt.toISOString(), stale,
+      participants: rows.flatMap(response => { const member = members.find(m => m.id === response.userId); return member ? [{ id: member.id, name: member.name, confirmedAt: response.confirmedAt?.toISOString() ?? null }] : []; }) } : null,
+      canRequest: !context.archived && item.permission === "edit", canConfirm: !context.archived && !stale && rows.some(response => response.userId === actorId && !response.confirmedAt),
+      candidates: !context.archived && item.permission === "edit" ? members.map(({ id, name }) => ({ id, name })) : [] };
+  });
+}
+export async function requestDocumentConfirmation(actorId: string, projectId: string, documentId: string, input: unknown) {
+  const data = writeInput.extend({ epoch: z.number().int().positive(), reviewerIds: z.array(uuid).min(1).max(100) }).strict().parse(input);
+  return projectContext(actorId, projectId, async context => {
+    const item = await access(context, documentId, true); edit(context, item);
+    return once(context, data.requestId, `document.confirmation-request.${documentId}`, data, async () => {
+      revision(item, data.expectedRevision);
+      if (item.row.epoch !== data.epoch) throw new ConflictError("正文版本已改变，请重新打开后发起确认");
+      const members = await readableDocumentMembers(context, item.row);
+      const ids = [...new Set(data.reviewerIds)];
+      if (ids.some(id => !members.some(member => member.id === id))) throw new ForbiddenError("只能请当前有文档访问权限的成员确认，请先调整分享权限");
+      await context.tx.update(confirmationRounds).set({ invalidatedAt: new Date() }).where(and(eq(confirmationRounds.documentId, documentId), isNull(confirmationRounds.invalidatedAt)));
+      const [round] = await context.tx.insert(confirmationRounds).values({ documentId, requestedById: actorId, epoch: item.row.epoch, revision: item.row.revision, bodyHash: bodyHash(item.row.content) }).returning();
+      await context.tx.insert(confirmations).values(ids.map(userId => ({ roundId: round.id, userId })));
+      await documentNotification(context, item.row, "document.confirmation_requested", `document.confirmation-request:${round.id}`, ids);
+      return { id: round.id };
+    });
+  });
+}
+export async function confirmDocument(actorId: string, projectId: string, documentId: string, input: unknown) {
+  const data = writeInput.extend({ epoch: z.number().int().positive(), roundId: uuid }).strict().parse(input);
+  return projectContext(actorId, projectId, async context => {
+    const item = await access(context, documentId, true); active(context, item);
+    return once(context, data.requestId, `document.confirm.${documentId}`, data, async () => {
+      revision(item, data.expectedRevision);
+      const [round] = await context.tx.select().from(confirmationRounds).where(and(eq(confirmationRounds.id, data.roundId), eq(confirmationRounds.documentId, documentId)));
+      if (!round || round.invalidatedAt || round.epoch !== data.epoch || item.row.epoch !== data.epoch || round.bodyHash !== bodyHash(item.row.content)) throw new ConflictError("正文已更新，需要重新发起确认；不能确认旧版本");
+      const [response] = await context.tx.update(confirmations).set({ confirmedAt: new Date() }).where(and(eq(confirmations.roundId, round.id), eq(confirmations.userId, actorId), isNull(confirmations.confirmedAt))).returning();
+      if (!response) throw new ConflictError("你不在此次确认名单中，或已经确认");
+      if (round.requestedById) await documentNotification(context, item.row, "document.confirmed", `document.confirmed:${round.id}:${actorId}`, [round.requestedById]);
+      return { id: round.id, confirmedAt: response.confirmedAt!.toISOString() };
+    });
+  });
 }
 export async function createDocument(actorId: string, projectId: string, input: unknown) {
   const data = z.object({ requestId: uuid, title: z.string().trim().min(1).max(120), folder: z.string().trim().min(1).max(80).default("未分类"), visibility: z.enum(["private", "project"]).default("project"), content: z.unknown().optional() }).parse(input);
@@ -184,7 +262,8 @@ function safeAwareness(value: string | null | undefined, context: Context, sessi
   } catch { throw new ValidationError("在线光标数据不正确"); }
 }
 export async function syncDocument(actorId: string, projectId: string, documentId: string, input: unknown): Promise<DocumentSyncResult> {
-  const data = z.object({ sessionId: uuid, epoch: z.number().int().positive(), stateVector: z.string().max(1400000).optional(), update: z.string().max(1400000).optional(), awareness: z.string().max(16000).nullable().optional() }).parse(input);
+  const data = z.object({ sessionId: uuid, expectedActorId: uuid.optional(), epoch: z.number().int().positive(), stateVector: z.string().max(1400000).optional(), update: z.string().max(1400000).optional(), awareness: z.string().max(16000).nullable().optional() }).parse(input);
+  if (data.expectedActorId && data.expectedActorId !== actorId) throw new ForbiddenError("登录账号已改变，请重新打开文档；原账号的草稿不会上传");
   return projectContext(actorId, projectId, async context => {
     const item = await access(context, documentId, true);
     if (item.row.deletedAt) throw new ForbiddenError("文档已移入回收站，请保留未保存内容后重新打开");
@@ -201,6 +280,7 @@ export async function syncDocument(actorId: string, projectId: string, documentI
           // also consume storage). A manual version restore starts a fresh epoch.
           if (state.length > 2400000) throw new ValidationError("文档同步历史较大，请保存命名版本并恢复该版本以整理历史");
           const content = yDocumentContent(ydoc);
+          await invalidateDocumentConfirmation(context, row, content);
           await indexReferences(context, documentId, content);
           if (Date.now() - row.checkpointAt.getTime() >= 60000) await saveVersion(context, row, "自动保存点", "checkpoint");
           const [saved] = await context.tx.update(documents).set({ state, content, searchText: documentText(content), revision: row.revision + 1, lastEditedById: actorId, updatedAt: new Date(), checkpointAt: Date.now() - row.checkpointAt.getTime() >= 60000 ? new Date() : row.checkpointAt }).where(eq(documents.id, documentId)).returning();
@@ -250,6 +330,7 @@ export async function restoreDocumentVersion(actorId: string, projectId: string,
       const [selected] = await context.tx.select().from(versions).where(and(eq(versions.id, versionId), eq(versions.documentId, documentId))); if (!selected) throw new ForbiddenError();
       await saveVersion(context, item.row, "恢复前的内容", "restore");
       const content = validateDocumentContent(selected.content);
+      await invalidateDocumentConfirmation(context, item.row, content, item.row.epoch + 1);
       await indexReferences(context, documentId, content, true);
       const [row] = await context.tx.update(documents).set({ content, state: contentToYState(content), searchText: documentText(content), epoch: item.row.epoch + 1, revision: item.row.revision + 1, lastEditedById: actorId, checkpointAt: new Date(), updatedAt: new Date() }).where(eq(documents.id, documentId)).returning();
       await context.tx.delete(presence).where(eq(presence.documentId, documentId));
@@ -266,6 +347,9 @@ export async function addDocumentComment(actorId: string, projectId: string, doc
       if (data.replyToId && !parent) throw new ForbiddenError("原评论已删除或不属于此文档");
       if (!parent && data.blockId && !documentBlockExists(item.row.content, data.blockId)) throw new ConflictError("该段落已改变或删除，请重新选择段落");
       const [row] = await context.tx.insert(comments).values({ documentId, replyToId: parent?.id, blockId: parent ? parent.blockId : data.blockId, quote: parent ? parent.quote : data.quote, body: data.body, authorId: actorId, authorName: context.actorName }).returning({ id: comments.id });
+      const participants = await context.tx.select({ id: comments.authorId }).from(comments).where(and(eq(comments.documentId, documentId), isNull(comments.deletedAt)));
+      await documentNotification(context, item.row, parent ? "document.reply" : "document.comment", `document.comment:${row.id}`,
+        [...new Set([item.row.ownerId, ...participants.flatMap(person => person.id ? [person.id] : [])])], { commentId: row.id });
       return row;
     });
   });

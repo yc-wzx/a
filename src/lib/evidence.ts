@@ -164,6 +164,9 @@ export async function listProjectEvidence(
 ) {
   return query(actorId, projectId, parse(filters));
 }
+export async function exportProjectEvidenceRows(actorId:string,projectId:string,filters:Omit<EvidenceFilters,"offset"|"limit"> = {}) {
+  return query(actorId,projectId,parse(filters),1000);
+}
 export async function getProjectEvidenceItem(
   actorId: string,
   projectId: string,

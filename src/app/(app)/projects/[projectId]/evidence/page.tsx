@@ -15,6 +15,7 @@ import { getProjectForUser, listProjectMilestones } from "@/lib/project";
 import { listTeamMembers } from "@/lib/team";
 import type { DeliverableType } from "@/db/schema";
 import { EvidenceExportButton } from "./export-button";
+import { CsvDownload } from "@/components/csv-download";
 
 const KIND_VALUES = ["submission", "review", "milestone_feedback"] as const;
 type EvidenceKind = (typeof KIND_VALUES)[number];
@@ -260,6 +261,7 @@ export default async function ProjectEvidencePage({
             共 {total} 条，本页 {items.length} 条
           </p>
           <EvidenceExportButton projectId={projectId} filters={filters} />
+          <CsvDownload projectId={projectId} kind="formal" filters={filters} />
         </div>
 
         {queryError && (

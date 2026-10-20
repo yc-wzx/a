@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { createTeam, joinTeam } from "@/lib/team";
 import { AppError } from "@/lib/errors";
 
-export type FormState = { error: string } | null;
+export type FormState = { error?: string; success?: string } | null;
 
 const nameSchema = z.string().trim().min(1, "请填写团队名称");
 const inviteCodeSchema = z.string().trim().min(1, "请填写邀请码");
@@ -37,7 +37,8 @@ export async function joinTeamAction(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   try {
-    await joinTeam(session.user.id, parsed.data);
+    const result = await joinTeam(session.user.id, parsed.data);
+    if ("pendingApproval" in result) { revalidatePath("/teams"); return { success: "加入申请已提交，管理员审核通过后即可进入团队。" }; }
   } catch (e) {
     if (e instanceof AppError) return { error: e.message };
     throw e;

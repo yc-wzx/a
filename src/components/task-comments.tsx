@@ -9,6 +9,7 @@ import {
 } from "@/app/(app)/projects/[projectId]/tasks/comments/actions";
 import { collaborationAction } from "@/app/(app)/projects/[projectId]/tasks/collaboration-actions";
 import { newRequestId } from "@/lib/request-id";
+import { SourceTaskButton } from "@/components/tasks/source-task";
 type Loaded = Extract<
   Awaited<ReturnType<typeof getTaskCommentsAction>>,
   { ok: true }
@@ -129,6 +130,7 @@ export function TaskComments({
           </p>
           {item.replyToId && <p className="border-l-2 border-line pl-2 text-xs text-ink-faint">回复：{data.page.items.find(m => m.id === item.replyToId)?.body.slice(0, 80) ?? "较早的团队评论"}</p>}
           <p className="whitespace-pre-wrap">{item.body}</p>
+          {data.canWrite && data.role !== "teacher" && <SourceTaskButton projectId={projectId} sourceType="comment" sourceId={item.id} revision={String(item.revision)} text={item.body} />}
           <div className="flex gap-3 text-xs text-primary"><button type="button" disabled={!data.canWrite} onClick={() => { setReplyTo(item.id); setEditing(null); }}>回复</button><button type="button" disabled={!data.canWrite} onClick={async () => { const enabled = !data.reactions.some(r => r.messageId === item.id && r.userId === data.actorId); const r = await collaborationAction(projectId, taskId, { op: "react", channel: "team", messageId: item.id, enabled }); if (!r.ok) setError(r.error); else await reload(); }}>收到 {data.reactions.filter(r => r.messageId === item.id).length || ""}</button></div>
           {item.mentionedUserIds.length > 0 && (
             <p className="text-xs text-primary">

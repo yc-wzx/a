@@ -41,6 +41,8 @@ function git(args) {
   return result.stdout.trim();
 }
 function preflight() {
+  if (env.ATTACHMENT_STORAGE_DIR && env.ATTACHMENT_STORAGE_DIR !== "/app/storage/attachments")
+    throw Error("Production attachments must use the mounted /app/storage/attachments directory");
   for (const key of ["AUTH_SECRET", "CRON_SECRET", "POSTGRES_PASSWORD"])
     if (!env[key] || env[key].length < 32 || env[key].includes("REPLACE"))
       throw Error(
@@ -89,6 +91,14 @@ function preflight() {
   console.log("Preflight passed (secrets suppressed)");
 }
 const directory = path.join(root, "backups");
+function fileDigest(filename) {
+  const hash = createHash("sha256"), fd = fs.openSync(filename, "r"), buffer = Buffer.alloc(65536);
+  try {
+    let bytes;
+    while ((bytes = fs.readSync(fd, buffer, 0, buffer.length, null)) > 0) hash.update(buffer.subarray(0, bytes));
+    return hash.digest("hex");
+  } finally { fs.closeSync(fd); }
+}
 function backupFile(input) {
   const resolved = path.resolve(input);
   if (path.dirname(resolved) !== directory || !resolved.endsWith(".dump"))
@@ -127,9 +137,14 @@ async function backup() {
   );
   const [code] = await complete;
   if (code !== 0) throw Error("Backup failed; do not use the partial dump");
-  const hash = createHash("sha256")
-    .update(fs.readFileSync(filename))
-    .digest("hex");
+  const attachmentFile = filename + ".attachments.tar";
+  const files = spawn("docker", [...prefix,"exec","-T","app","sh","-c","if [ -d /app/storage/attachments ]; then tar -C /app/storage/attachments -cf - .; else tar -cf - -T /dev/null; fi"], {cwd:root,stdio:["ignore","pipe","inherit"]});
+  const filesComplete = once(files,"close");
+  await pipeline(files.stdout,fs.createWriteStream(attachmentFile,{flags:"wx",mode:0o600}));
+  const [filesCode] = await filesComplete;
+  if(filesCode !== 0 || Date.now()-startedAt>=3600000) throw Error("Attachment backup failed or exceeded the one-hour deletion grace. Do not use this pair.");
+  const attachmentHash = fileDigest(attachmentFile);
+  const hash = fileDigest(filename);
   fs.writeFileSync(
     filename + ".json",
     JSON.stringify(
@@ -139,6 +154,7 @@ async function backup() {
         database: env.POSTGRES_DB ?? "agilecampus",
         createdAt: new Date().toISOString(),
         sizeBytes: fs.statSync(filename).size,
+        attachments: {filename:path.basename(attachmentFile),sha256:attachmentHash,sizeBytes:fs.statSync(attachmentFile).size},
         durationMs: Date.now() - startedAt,
       },
       null,
@@ -154,7 +170,7 @@ function restoreDrill(file) {
   const filename = backupFile(file),
     manifest = JSON.parse(fs.readFileSync(filename + ".json", "utf8"));
   if (
-    createHash("sha256").update(fs.readFileSync(filename)).digest("hex") !==
+    fileDigest(filename) !==
     manifest.sha256
   )
     throw Error("Backup checksum mismatch");
@@ -192,12 +208,29 @@ function restoreDrill(file) {
     ],
     { capture: true },
   );
+  let restoredFiles = null;
+  if(manifest.attachments){
+    const archive=filename+".attachments.tar";
+    if(manifest.attachments.filename!==path.basename(archive)||fileDigest(archive)!==manifest.attachments.sha256)throw Error("Attachment backup checksum mismatch");
+    const inventory=spawnSync("tar",["-tf",archive],{encoding:"utf8"});
+    if(inventory.status!==0||inventory.stdout.split(/\r?\n/).filter(Boolean).some(name=>!/^\.\/$/.test(name)&&!/^(?:\.\/)?[a-f0-9-]{36}(?:\.orphan)?$/.test(name)))throw Error("Unexpected path in attachment backup");
+    const output=path.resolve(directory,`attachments-restore-${Date.now()}`);
+    if(path.dirname(output)!==directory)throw Error("Restore destination must stay inside backups");
+    fs.mkdirSync(output,{mode:0o700});
+    const extracted=spawnSync("tar",["-xf",archive,"-C",output],{stdio:"inherit"});
+    if(extracted.status!==0)throw Error("Attachment restore failed");
+    const hasAttachments=run(["exec","-T","db","psql","-U","agilecampus","-d",database,"-At","-c","select to_regclass('public.project_attachments') is not null"],{capture:true})==="t";
+    const records=hasAttachments?JSON.parse(run(["exec","-T","db","psql","-U","agilecampus","-d",database,"-At","-c","select coalesce(json_agg(json_build_object('key',storage_key,'digest',digest,'size',size)),'[]') from project_attachments where deleted_at is null"],{capture:true})):[];
+    for(const record of records){if(!/^[a-f0-9-]{36}$/.test(record.key))throw Error("Invalid attachment storage key");const bytes=fs.readFileSync(path.join(output,record.key));if(bytes.length!==record.size||createHash("sha256").update(bytes).digest("hex")!==record.digest)throw Error("Restored attachment mismatch");}
+    restoredFiles={directory:output,verified:records.length};
+  }
   fs.writeFileSync(
     filename + ".restore.json",
     JSON.stringify(
       {
         database,
         counts,
+        attachments:restoredFiles,
         verifiedAt: new Date().toISOString(),
         durationMs: Date.now() - startedAt,
         note: "Independent restore only; compare representative business records before live recovery.",

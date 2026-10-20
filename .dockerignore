@@ -5,6 +5,8 @@
 # 构建无需、且拖慢上下文/污染 layer
 node_modules
 .next
+.next-*
+.data
 .git
 backups
 .release.json

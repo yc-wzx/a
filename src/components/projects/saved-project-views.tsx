@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   applySavedView,
@@ -11,17 +11,6 @@ import {
   type SavedProjectView,
 } from "@/lib/project-views";
 
-const EVENT = "agilecampus:saved-project-views";
-function subscribe(listener: () => void) {
-  window.addEventListener("storage", listener);
-  window.addEventListener(EVENT, listener);
-  return () => {
-    window.removeEventListener("storage", listener);
-    window.removeEventListener(EVENT, listener);
-  };
-}
-const serverSnapshot = () => "";
-
 export function SavedProjectViews({
   userId,
   projectId,
@@ -30,34 +19,43 @@ export function SavedProjectViews({
   projectId: string;
 }) {
   const key = savedViewsStorageKey(userId, projectId);
-  const getSnapshot = useCallback(() => {
-    try {
-      return localStorage.getItem(key) ?? "";
-    } catch {
-      return "";
-    }
-  }, [key]);
-  const raw = useSyncExternalStore(subscribe, getSnapshot, serverSnapshot);
-  const views = useMemo(() => readSavedViews(raw), [raw]);
+  const [views, setViews] = useState<SavedProjectView[]>([]);
+  const [legacy, setLegacy] = useState<SavedProjectView[]>([]);
+  const [revision, setRevision] = useState(0);
+  const [ready, setReady] = useState(false), [pending, setPending] = useState(false);
+  const writing = useRef(false);
   const [name, setName] = useState("");
   const [selected, setSelected] = useState("");
   const [message, setMessage] = useState("");
+  const load = useCallback(async () => {
+    setReady(false);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/saved-views`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || "读取常用筛选失败");
+      setViews(result.data.views); setRevision(result.data.revision); setReady(true);
+      try { setLegacy(readSavedViews(localStorage.getItem(key) ?? "").filter(v => !result.data.views.some((old: SavedProjectView) => old.id === v.id))); } catch { /* Storage may be disabled; server preferences remain usable. */ }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "读取失败，请重试"); }
+  }, [projectId, key]);
+  useEffect(() => { let active = true; void Promise.resolve().then(() => { if (active) return load(); }); return () => { active = false; }; }, [load]);
   const router = useRouter(),
     pathname = usePathname(),
     params = useSearchParams();
   const current = views.find((v) => v.id === selected);
-  function write(next: SavedProjectView[], success: string) {
+  async function write(next: SavedProjectView[], success: string) {
+    if (!ready || writing.current) return false;
+    writing.current = true; setPending(true);
     try {
-      localStorage.setItem(key, JSON.stringify(next));
-      window.dispatchEvent(new Event(EVENT));
+      const response = await fetch(`/api/projects/${projectId}/saved-views`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: revision, views: next }) });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || "保存失败，请重新加载后重试");
+      setViews(result.data.views); setRevision(result.data.revision);
       setMessage(success);
       return true;
-    } catch {
-      setMessage(
-        "浏览器禁止保存设置；当前筛选仍可正常使用，请允许站点存储后重试。",
-      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "保存失败，请重新加载后重试");
       return false;
-    }
+    } finally { writing.current = false; setPending(false); }
   }
   function validateName() {
     const value = name.trim();
@@ -81,8 +79,16 @@ export function SavedProjectViews({
       </summary>
       <div className="mt-3 space-y-3">
         <p className="text-xs text-ink-soft">
-          仅保存于当前浏览器，按你的账号和项目分开；更换设备或清除浏览器数据后不会保留。
+          保存在你的账号中，按项目分开；登录其他设备后也可使用。最多保存 12 个。
         </p>
+        <button className="ac-btn-ghost" type="button" disabled={pending} onClick={() => void load()}>重新加载</button>
+        {!!legacy.length && <div className="rounded-lg border border-line p-2 text-sm">此浏览器还有 {legacy.length} 个旧筛选。<button type="button" className="ac-btn-ghost" disabled={!ready || pending} onClick={async () => {
+          const next = [...views];
+          for (const item of legacy) if (!next.some(v => v.id === item.id || v.name === item.name)) next.push(item);
+          if (next.length > MAX_SAVED_VIEWS) { setMessage("合并后超过 12 个，请先删除不用的筛选。"); return; }
+          if (await write(next, "旧筛选已导入账号；浏览器原数据仍保留。")) setLegacy([]);
+        }}>导入我的旧筛选</button></div>}
+        <fieldset disabled={!ready || pending} className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <label className="sr-only" htmlFor="saved-view-select">
             已保存的筛选
@@ -126,10 +132,10 @@ export function SavedProjectViews({
             type="button"
             className="ac-btn-ghost"
             disabled={!current}
-            onClick={() => {
+            onClick={async () => {
               if (
                 current &&
-                write(
+                await write(
                   views.filter((v) => v.id !== current.id),
                   "已删除保存的筛选，任务数据不受影响。",
                 )
@@ -144,7 +150,7 @@ export function SavedProjectViews({
         </div>
         <form
           className="flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             const value = validateName();
             if (!value) return;
@@ -161,7 +167,7 @@ export function SavedProjectViews({
               name: value,
               query: savedViewQuery(new URLSearchParams(params.toString())),
             };
-            if (write([...views, item], "已保存当前筛选、分组、视图和排序。"))
+            if (await write([...views, item], "已保存到账号：当前筛选、分组、视图和排序。"))
               setSelected(item.id);
           }}
         >
@@ -197,6 +203,7 @@ export function SavedProjectViews({
             重命名
           </button>
         </form>
+        </fieldset>
         <p role="status" className="text-xs text-ink-soft">
           {message}
         </p>

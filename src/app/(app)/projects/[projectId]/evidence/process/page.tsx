@@ -9,6 +9,7 @@ import type { EvidenceFilters } from "@/contracts/p0-p2";
 import { ValidationError } from "@/lib/errors";
 import { ProjectNav } from "@/components/projects/project-nav";
 import { MarkdownDownload } from "@/components/markdown-download";
+import { CsvDownload } from "@/components/csv-download";
 import { exportProjectEvidenceMarkdownAction } from "../actions";
 import { z } from "zod";
 const names = {
@@ -208,6 +209,7 @@ export default async function Page({
               timeZone: "Asia/Shanghai",
             })}
           </p>
+          <CsvDownload projectId={projectId} kind="process" filters={filters} />
           <MarkdownDownload
             action={exportProjectEvidenceMarkdownAction.bind(
               null,

@@ -286,6 +286,7 @@ export async function changeMyEvent(
       )
       .for("update");
     if (!row) throw new NotFoundError();
+    if (row.source.startsWith("external:") && (!data.event || data.event.title !== row.title || Date.parse(data.event.startAt) !== row.startAt.getTime() || Date.parse(data.event.endAt) !== row.endAt.getTime())) throw new ForbiddenError("此日程来自持续订阅，请在来源日历修改，或在外部日历页面断开连接");
     if (row.revision !== data.expectedRevision)
       throw new ConflictError("日程已变化，请刷新核对");
     if (data.event) {

@@ -9,6 +9,8 @@ import { listTeamMembers } from "@/lib/team";
 import { REFERENCE_TYPES } from "@/lib/reference-labels";
 import { ReferenceForm, DeleteReferenceForm } from "./reference-form";
 import { ProjectNav } from "@/components/projects/project-nav";
+import { ProjectAttachments } from "@/components/attachments/project-attachments";
+import { ReferencePreview } from "@/components/attachments/reference-preview";
 
 export default async function ReferencesPage({
   params,
@@ -72,6 +74,7 @@ export default async function ReferencesPage({
         ))}
       </nav>
       <section aria-label="资料列表" className="space-y-3">
+        <ProjectAttachments projectId={projectId} targetType="project" targetId={projectId} canUpload={access.project.status !== "archived"} />
         {!references.items.length && (
           <p className="ac-card p-5 text-sm text-ink-soft">暂无记录。</p>
         )}
@@ -93,6 +96,7 @@ export default async function ReferencesPage({
             >
               {new URL(record.url).host} · 打开原链接 ↗
             </a>
+            <ReferencePreview projectId={projectId} referenceId={record.id} />
             <div className="flex flex-wrap gap-2 text-sm text-ink-soft">
               {record.meetingDate && (
                 <span>会议日期：{record.meetingDate}</span>

@@ -15,10 +15,13 @@ import { installUnsavedChangesGuard } from "@/lib/unsaved-changes";
 import { EditorBoundary } from "./editor-boundary";
 import { DocumentSnapshot, snapshotText } from "./document-snapshot";
 import { DocumentTaskDialog, type DocumentTaskSource, type DocumentTaskInput } from "./document-task-dialog";
+import { DocumentRecovery } from "./document-recovery";
+import { DocumentConfirmationPanel } from "./document-confirmation";
+import { ProjectAttachments } from "@/components/attachments/project-attachments";
 
 const EditorView = dynamic(() => import("./document-editor"), { ssr: false, loading: () => <p className="p-8 text-sm text-ink-soft">正在加载编辑器…</p> });
 const permissionNames = { read: "可阅读", comment: "可评论", edit: "可编辑" };
-const statusNames = { connecting: "连接中…", saving: "保存中…", saved: "已保存", offline: "连接中断 · 正文保留在此页面", blocked: "同步已停止", restored: "历史版本已恢复，请重新打开" };
+const statusNames = { connecting: "连接中…", saving: "保存中…", saved: "已保存", offline: "连接中断 · 等待同步", blocked: "同步已停止", restored: "历史版本已恢复，请重新打开" };
 type VersionDetail = { version: DocumentVersion; content: DocumentNode; markdown: string };
 type AiPreview = { text: string; operation: string; epoch: number; revision: number; from: number; to: number; selection: string };
 type CommentTarget = { blockId: string | null; quote: string };
@@ -67,6 +70,7 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
   const [selectedText, setSelectedText] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const editorHandle = useRef<DocumentEditorHandle | null>(null);
+  const [activeEditorHandle, setActiveEditorHandle] = useState<DocumentEditorHandle | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const [editorReady, setEditorReady] = useState(false), [slow, setSlow] = useState(false), [showSnapshot, setShowSnapshot] = useState(false);
   const pendingDraft = useRef(false);
@@ -75,8 +79,18 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
   const [snapshotContent, setSnapshotContent] = useState(initial.content);
   useEffect(() => { const timer = setTimeout(() => setSlow(true), 8000); return () => clearTimeout(timer); }, []);
   const selectionCleanup = useRef<(() => void) | null>(null);
+  const commentHashApplied = useRef("");
   const [initialEditor] = useState(initial);
   const base = `/api/projects/${initial.projectId}/documents/${initial.id}`;
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.startsWith("#comment-") || hash === commentHashApplied.current) return;
+    const commentId = hash.slice(9);
+    const target = document.querySelector(`[data-document-comment="${CSS.escape(commentId)}"]`);
+    if (!target) return;
+    commentHashApplied.current = hash;
+    requestAnimationFrame(() => { setTab("comments"); target.scrollIntoView({ block: "center" }); target.classList.add("document-highlight"); setTimeout(() => target.classList.remove("document-highlight"), 2400); });
+  }, [detail.comments]);
   const canEdit = detail.canEdit && sync.permission === "edit" && !["blocked", "restored"].includes(sync.status);
   const canComment = detail.canComment && ["edit", "comment"].includes(sync.permission) && !["blocked", "restored"].includes(sync.status);
   const canCreateTask = detail.canCreateTask && !["blocked", "restored"].includes(sync.status);
@@ -104,6 +118,7 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
     selectionCleanup.current?.();
     selectionCleanup.current = null;
     editorHandle.current = handle;
+    setActiveEditorHandle(handle);
     setEditorReady(!!handle);
     if (!handle) return;
     const selection = () => {
@@ -259,6 +274,9 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
     {createdTask && <p className="text-sm"><Link href={createdTask.href} className="text-primary hover:underline">查看刚创建的任务 →</Link></p>}
     {(["blocked", "restored"].includes(sync.status) || sync.pending && sync.status === "offline") && <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-3 text-sm"><span>先保留当前页面的内容：</span><button className="ac-btn-ghost" onClick={() => void action(async () => { await navigator.clipboard.writeText(editorHandle.current?.editor.getText() ?? ""); setNotice("当前正文已复制。"); })}><Copy size={13} />复制正文</button><button className="ac-btn-ghost" onClick={() => downloadText(JSON.stringify(editorHandle.current?.editor.getJSON(), null, 2), `${safeFilename(detail.title)}-未保存副本.json`)}>下载副本</button><button className="ac-btn-ghost" onClick={() => { if (!sync.pending || window.confirm("请确认已复制或下载未保存内容。现在重新打开？")) window.location.reload(); }}>重新打开</button></div>}
     {((slow && !editorReady) || sync.status === "offline") && <section role="status" className="space-y-3 rounded-xl border border-line bg-surface p-4 text-sm"><p>{!editorReady ? "编辑器加载较慢，可以先阅读已保存的正文。" : "协作连接暂时中断，当前输入仍保留在此页面；恢复后会继续保存。"}</p><div className="flex flex-wrap gap-2"><button className="ac-btn-ghost" onClick={() => { setSnapshotContent(editorHandle.current?.editor.getJSON() as DocumentNode ?? initial.content); setShowSnapshot(v => !v); }}>{showSnapshot ? "收起正文副本" : "阅读正文副本"}</button><button className="ac-btn-ghost" onClick={() => { if (editorHandle.current) void action(async () => { await editorHandle.current!.provider.sync(); }); else window.location.reload(); }}>重试连接</button><button className="ac-btn-ghost" onClick={() => downloadText(snapshotText(editorHandle.current?.editor.getJSON() as DocumentNode ?? initial.content), `${safeFilename(detail.title)}-正文副本.txt`)}>下载正文副本</button></div><p className="text-xs text-ink-soft">副本来自本次打开时的已保存正文；若已进入编辑器，则使用当前页面内容。副本不代表同步已完成。</p>{showSnapshot && <DocumentSnapshot content={snapshotContent} />}</section>}
+    {sync.recoveryError && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">本地恢复副本暂未保存：{sync.recoveryError} 请保留当前页面或下载副本。</p>}
+    <DocumentRecovery initial={initial} handle={activeEditorHandle} />
+    <DocumentConfirmationPanel detail={detail} handle={activeEditorHandle} revision={sync.revision} />
     <nav className="document-actions flex flex-wrap gap-2" aria-label="文档协作面板">{sideButtons.map((button) => <button key={button.id} className={tab === button.id ? "ac-btn" : "ac-btn-ghost"} onClick={() => { if (button.id === "settings" && tab !== "settings") loadSettings(); setTab(tab === button.id ? null : button.id); }} aria-expanded={tab === button.id}><button.icon size={14} />{button.label}{button.id === "comments" && detail.comments.filter((item) => !item.resolvedAt).length > 0 && ` ${detail.comments.filter((item) => !item.resolvedAt).length}`}</button>)}</nav>
     <div className={`grid items-start gap-4 ${tab ? "grid-cols-[minmax(0,1fr)_270px]" : "grid-cols-1"}`}>
       <section className="ac-card min-w-0 overflow-hidden" data-document-print><h2 className="hidden print:block text-xl font-semibold">{detail.title}</h2><EditorBoundary fallback={<div className="space-y-4 p-6"><p role="alert" className="text-sm">编辑器加载失败。以下为本次打开时的已保存正文。</p><button className="ac-btn-ghost" onClick={() => window.location.reload()}>重新加载编辑器</button><DocumentSnapshot content={initial.content} /></div>}><EditorView initial={initialEditor} editable={canEdit} canComment={canComment} onReady={onReady} onSync={onSync} onComment={targetComment} onAi={() => setTab("ai")} references={relations.outgoing} canCreateTask={canCreateTask} onCreateTask={editor => void startDocumentTask(editor)} /></EditorBoundary></section>
@@ -312,6 +330,7 @@ export function DocumentWorkspace({ initial }: { initial: DocumentDetail }) {
         </>}
       </aside>}
     </div>
+    <ProjectAttachments projectId={detail.projectId} targetType="document" targetId={detail.id} canUpload={canEdit} />
     {deleteOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-6" role="dialog" aria-modal="true" aria-labelledby="delete-document-title"><div className="ac-card max-w-sm space-y-4 p-6"><h2 id="delete-document-title" className="font-semibold">将文档移到回收站？</h2><p className="text-sm text-ink-soft">成员将无法打开此文档，可在项目文档的回收站恢复。正文、评论和版本会保留。</p><div className="flex justify-end gap-2"><button className="ac-btn-ghost" disabled={busy} onClick={() => setDeleteOpen(false)}>取消</button><button className="ac-btn" disabled={busy} onClick={() => void action(async () => { const revision = await flushedRevision(); await documentMutation(base, "DELETE", { expectedRevision: revision }); router.push(`/projects/${detail.projectId}/documents`); })}>移到回收站</button></div></div></div>}
     {version && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-6" role="dialog" aria-modal="true" aria-labelledby="document-version-title"><div className="ac-card flex max-h-[85vh] w-full max-w-3xl flex-col gap-4 p-6"><div className="flex justify-between gap-3"><h2 id="document-version-title" className="font-semibold">{version.version.label}</h2><button aria-label="关闭版本查看" onClick={() => setVersion(null)}><X size={18} /></button></div><div className="flex flex-wrap gap-2"><select aria-label="比较的文档版本" className="min-w-0 rounded border border-line bg-canvas p-2 text-sm" value={compareId} onChange={(event) => setCompareId(event.target.value)}><option value="">与当前正文比较</option>{detail.versions.filter((item) => item.id !== version.version.id).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><button className="ac-btn-ghost" disabled={busy} onClick={() => void action(compareVersion)}>查看差异</button><button className="ac-btn-ghost" onClick={() => downloadText(version.markdown, `${safeFilename(detail.title)}-${safeFilename(version.version.label)}.md`)}>导出此版本</button>{canEdit && <button className="ac-btn" disabled={busy} onClick={() => void action(restoreVersion)}>恢复此版本</button>}</div>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<pre className="min-h-0 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-canvas p-4 text-xs leading-relaxed">{comparison || version.markdown || "空文档"}</pre>{comparison && <p className="text-xs text-ink-soft">以 − 开头的行为旧内容，+ 开头的行为新内容。</p>}</div></div>}
     {taskSource && <DocumentTaskDialog document={detail} source={taskSource} busy={busy} error={error} onClose={() => { if (!busy) setTaskSource(null); }} onSubmit={input => void action(() => submitDocumentTask(input))} />}

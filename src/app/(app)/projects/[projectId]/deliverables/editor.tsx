@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ProjectAttachments } from "@/components/attachments/project-attachments";
 
 import {
   createDeliverableDraftAction,
@@ -151,6 +152,7 @@ export function DeliverableEditor({
       }}
     >
       <fieldset disabled={pending} className="space-y-4">
+        {deliverableId && <ProjectAttachments projectId={projectId} targetType="deliverable" targetId={deliverableId} canUpload={!pending} onUploaded={item => { update("url",new URL(item.href,location.origin).href); }} />}
         <div className="space-y-1">
           <label htmlFor="deliverable-title" className="block text-sm">
             成果标题
@@ -288,7 +290,7 @@ export function DeliverableEditor({
       )}
 
       <p className="text-xs text-ink-soft">
-        保存草稿后，在成果详情确认内容并正式提交。这里仅保存外部链接。
+        保存草稿后可上传附件；选择的附件会填入成果链接，核对后正式提交。
       </p>
     </form>
   );

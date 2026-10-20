@@ -12,6 +12,8 @@ import {
   sql,
 } from "drizzle-orm";
 import { db } from "@/db";
+import { captureIterationTrend } from "./iteration-trend";
+import { projectAttachments } from "@/db/course-extensions-schema";
 import type { DbTx } from "@/db";
 import {
   taskDependencies,
@@ -365,6 +367,7 @@ export async function deleteTaskV1(
             id: tasks.id,
             projectId: tasks.projectId,
             updatedAt: tasks.updatedAt,
+            sprintId: tasks.sprintId,
           })
           .from(tasks)
           .where(eq(tasks.id, taskId))
@@ -381,6 +384,8 @@ export async function deleteTaskV1(
         }
 
         await tx.delete(tasks).where(eq(tasks.id, taskId));
+        await tx.update(projectAttachments).set({deletedAt:new Date()}).where(and(eq(projectAttachments.targetType,"task"),eq(projectAttachments.targetId,taskId),isNull(projectAttachments.publishedAt)));
+        await captureIterationTrend(tx,task.sprintId);
         return { taskId, deleted: true as const };
       },
     ),

@@ -6,10 +6,12 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { teams } from "@/db/schema";
 import { getTeamMembership } from "@/lib/team";
-import { listTeamResourceUsages } from "@/lib/resource";
+import { listTeamResourceReservations, listTeamResourceUsages } from "@/lib/resource";
+import { teamManagementSettings } from "@/db/team-management-schema";
 import { ResourceForm } from "./resource-form";
 import { endResourceAction } from "./actions";
 import { displayDateTime } from "@/lib/display-time";
+import { ReservationControls, ReservationForm } from "./reservation-controls";
 
 function fmtTime(d: Date): string {
   return displayDateTime(d);
@@ -40,6 +42,10 @@ export default async function ResourcesPage({
 
   const { usages, byUser, byResource } = await listTeamResourceUsages(session.user.id, teamId);
   const active = usages.filter((u) => u.active);
+  const reservations = await listTeamResourceReservations(session.user.id, teamId);
+  const [settings] = await db.select().from(teamManagementSettings).where(eq(teamManagementSettings.teamId, teamId));
+  const archived = !!settings?.archivedAt;
+  const statusNames = { pending: "待审批", approved: "已批准", rejected: "已拒绝", cancelled: "已取消" };
   const canEnd = (userId: string) => userId === session.user.id || me.role === "admin";
 
   return (
@@ -48,14 +54,16 @@ export default async function ResourcesPage({
         <Link href="/teams" className="text-xs text-ink-soft hover:text-primary">
           ← 我的团队
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-ink">{team.name} · 资源占用</h1>
+        <h1 className="font-display text-2xl font-semibold text-ink">{team.name} · 资源预约与占用</h1>
         <p className="text-sm text-ink-soft">
           登记谁在何时占用了哪项共享资源。当前{" "}
           <span className="font-medium text-doing">{active.length}</span> 项占用中。
         </p>
       </header>
 
-      <ResourceForm teamId={teamId} />
+      <ReservationForm teamId={teamId} archived={archived} />
+      <section className="space-y-3"><div className="flex items-center justify-between"><h2 className="font-semibold">预约记录</h2><span className="text-xs text-ink-soft">最近200条 · 获批时才锁定时段</span></div>{reservations.length ? <ul className="space-y-3">{reservations.map(r => <li key={`${r.id}-${r.revision}`} className="ac-card space-y-3 p-4"><div className="flex justify-between"><h3 className="font-medium">{r.resourceName}</h3><span className={`ac-badge ${r.status === "approved" ? "bg-low-soft text-low" : "bg-canvas text-ink-soft"}`}>{statusNames[r.status]}</span></div><p className="text-sm text-ink-soft">{r.userName} · {r.purpose}</p><p className="text-xs text-ink-soft">{fmtTime(r.startTime)} → {fmtTime(r.endTime)}</p>{r.reviewNote && <p className="text-sm text-ink-soft">审批备注：{r.reviewNote}</p>}{((!archived && r.status === "pending" && ["admin", "teacher"].includes(me.role)) || (["pending", "approved"].includes(r.status) && r.userId === session.user.id)) && <ReservationControls teamId={teamId} id={r.id} revision={r.revision} canReview={!archived && r.status === "pending" && ["admin", "teacher"].includes(me.role)} canCancel={["pending", "approved"].includes(r.status) && r.userId === session.user.id} />}</li>)}</ul> : <p className="ac-card p-6 text-sm text-ink-soft">暂无预约。已有资源占用记录继续在下方保留。</p>}</section>
+      {!archived && <ResourceForm teamId={teamId} />}
 
       {/* 时长汇总 */}
       <div className="grid gap-4 sm:grid-cols-2">

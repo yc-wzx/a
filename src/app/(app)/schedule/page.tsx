@@ -15,6 +15,7 @@ import {
   ManualForm,
   PreferencesForm,
   EventControls,
+  ExternalEventSharing,
   EmergencyForm,
   SharingForm,
 } from "@/components/schedule/forms";
@@ -61,6 +62,7 @@ export default async function Page({
         <Link href="/projects" className="text-sm text-primary underline">
           选择项目进行规划
         </Link>
+        <Link href="/schedule/connections" className="ml-4 text-sm text-primary underline">外部日历连接与持续订阅</Link>
       </header>
       <ScheduleSections
         events={<>
@@ -126,7 +128,7 @@ export default async function Page({
                 ? "（尚未选择共享团队）"
                 : ""}
             </p>
-            <EventControls event={event} requestId={randomUUID()} />
+            {event.source.startsWith("external:") ? <><p className="text-xs text-ink-soft">来自持续订阅，<Link href="/schedule/connections" className="text-primary underline">管理连接或在来源日历修改</Link></p><ExternalEventSharing event={event} requestId={randomUUID()} /></> : <EventControls event={event} requestId={randomUUID()} />}
           </article>
         ))}
         <nav className="flex gap-4 text-sm">

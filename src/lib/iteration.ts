@@ -51,6 +51,7 @@ import { createTask, requireTaskWrite } from "./task";
 import { SUMMARY_COLS, backlogWhere, toTaskSummary, type TaskRow } from "./task-contract";
 import { lockTaskWriteAccess } from "./task-write-access";
 import { runIdempotent } from "./write-request";
+import { captureIterationTrend } from "./iteration-trend";
 
 // C / P0：迭代服务（定稿 9.3）。
 //
@@ -617,6 +618,7 @@ export async function startIteration(
             .where(eq(iterations.id, iterationId))
             .returning();
           await recordEvent(tx, projectId, iterationId, "started", actorId);
+          await captureIterationTrend(tx,iterationId);
           const iteration = toIteration(row);
           // E / P0：迭代动态。occurredAt 取本行的 startedAt（DB 时钟），不用宿主机时间。
           await recordProjectActivity(tx, {
@@ -692,6 +694,7 @@ async function moveTasks(
   }
 
   const next = touched.length > 0 ? await bumpRevision(tx, iterationId) : current;
+  if (touched.length > 0) await captureIterationTrend(tx,iterationId);
   if (touched.length > 0) {
     await recordEvent(
       tx,
@@ -1003,6 +1006,7 @@ export async function completeIteration(
           targets.push(d.targetIterationId);
         }
 
+        await captureIterationTrend(tx,iterationId);
         const [row] = await tx
           .update(iterations)
           .set({

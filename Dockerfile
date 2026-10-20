@@ -30,6 +30,8 @@ LABEL org.opencontainers.image.revision=$SOURCE_REVISION
 # 非 root 运行
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
+RUN mkdir -p /app/storage/attachments && chown -R nextjs:nodejs /app/storage
+ENV ATTACHMENT_STORAGE_DIR=/app/storage/attachments
 
 # standalone 自带精简 node_modules 与 server.js；static/public 须手工搬入
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

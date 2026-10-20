@@ -59,7 +59,7 @@ function scalar(value: unknown): string {
   return "";
 }
 // Never use the host timezone for floating ICS values. Dates mean Beijing calendar days.
-function normalizeIcs(content: string) {
+export function normalizeIcs(content: string) {
   const unfolded = content.replace(/^\uFEFF/, "").replace(/\r?\n[ \t]/g, "");
   if (
     !/^BEGIN:VCALENDAR\s*$/im.test(unfolded) ||

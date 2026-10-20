@@ -1,0 +1,30 @@
+import fs from "node:fs/promises";
+import {randomUUID} from "node:crypto";
+import {db} from "@/db";
+import {users,iterations,retrospectives} from "@/db/schema";
+import {hashPassword} from "@/lib/password";
+import {createTeam,joinTeam,updateMemberRole} from "@/lib/team";
+import {createProject} from "@/lib/project";
+import {createDocument} from "@/lib/documents";
+import {createIteration,createTaskWithIteration,startIteration,getIterationDetail} from "@/lib/iteration";
+import {createTaskComment} from "@/lib/comments";
+import {createProjectReference} from "@/lib/project-extras";
+async function main(){
+const url=new URL(process.env.DATABASE_URL!);
+if(!["127.0.0.1","localhost"].includes(url.hostname)||!url.pathname.includes("browser_extensions_20261020"))throw Error("Only the dedicated local browser database is supported");
+const accounts=await db.insert(users).values(await Promise.all(["admin","student","teacher","outsider"].map(async name=>({name:"本地验证"+name,email:name+"@extensions.local",passwordHash:await hashPassword("12345678")})))).returning();
+const[admin,student,teacher]=accounts,team=await createTeam(admin.id,"课程扩展本地测试团队");for(const user of[student,teacher])await joinTeam(user.id,team.inviteCode);await updateMemberRole(admin.id,team.id,teacher.id,"teacher");
+const project=await createProject(admin.id,team.id,{name:"课程扩展本地测试项目",startDate:"2026-10-01",endDate:"2026-11-30"});
+const iteration=await createIteration(student.id,project.id,{requestId:randomUUID(),name:"功能试用迭代",startDate:"2026-10-19",endDate:"2026-10-29"});
+const task=await createTaskWithIteration(student.id,project.id,{requestId:randomUUID(),task:{title:"本地附件与讨论验证",description:"用于本地检查，不代表真实项目成果",assigneeIds:[student.id,admin.id]},iteration:{id:iteration.id,revision:iteration.revision}});
+const before=await getIterationDetail(student.id,project.id,iteration.id);await startIteration(student.id,project.id,iteration.id,{requestId:randomUUID(),expectedRevision:before.iteration.revision});
+const document=await createDocument(student.id,project.id,{requestId:randomUUID(),title:"本地文档恢复与附件测试",content:{type:"doc",content:[{type:"heading",attrs:{level:1},content:[{type:"text",text:"课程验证"}]},{type:"paragraph",content:[{type:"text",text:"这份内容只用于本地验证，不表示团队真实进度。"}]}]}});
+const comment=await createTaskComment(student.id,project.id,task.id,{requestId:randomUUID(),body:"补充错误状态的交互说明",mentionedUserIds:[]});
+const reference=await createProjectReference(student.id,project.id,{requestId:randomUUID(),title:"Trello附件参考",type:"document",url:"https://support.atlassian.com/trello/docs/adding-attachments-to-cards/",note:"官方公开参考资料"});
+const [closed]=await db.insert(iterations).values({projectId:project.id,name:"复盘本地验证",startDate:"2026-10-01",endDate:"2026-10-10",status:"completed"}).returning();
+const[retro]=await db.insert(retrospectives).values({projectId:project.id,iterationId:closed.id,authorId:student.id,problems:"联调安排较晚",nextActions:"下轮提前确认接口"}).returning();
+const manifest={projectId:project.id,teamId:team.id,taskId:task.id,iterationId:iteration.id,documentId:document.id,commentId:comment.id,referenceId:reference.id,closedIterationId:closed.id,retrospectiveId:retro.id,accounts:Object.fromEntries(accounts.map(x=>[x.email.split("@")[0],x.id]))};
+await fs.writeFile("C:/Users/Hasumi/.codex/tmp/agilecampus-aliyun/extensions-browser-manifest.json",JSON.stringify(manifest));
+console.log(JSON.stringify(manifest));process.exit(0);
+}
+void main().catch(error=>{console.error(error);process.exit(1);});

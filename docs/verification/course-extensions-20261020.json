@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-20",
+  "scope": "Desktop course collaboration extensions",
+  "status": "Release verification in progress",
+  "rea": { "evidence": "Official public help pages observed with REA 6.4", "authenticatedVendorTesting": false },
+  "localBrowser": { "groups": 35, "pageErrors": 0 },
+  "caldav": { "protocolTests": true, "realProviderAccountConnected": false },
+  "paidAiCalls": "Not configured for demo accounts",
+  "dataPolicy": "Additive migrations; preserve existing accounts, secrets and business records"
+}
