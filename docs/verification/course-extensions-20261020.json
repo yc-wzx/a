@@ -1,10 +1,35 @@
 {
   "date": "2026-10-20",
   "scope": "Desktop course collaboration extensions",
-  "status": "Release verification in progress",
-  "rea": { "evidence": "Official public help pages observed with REA 6.4", "authenticatedVendorTesting": false },
-  "localBrowser": { "groups": 35, "pageErrors": 0 },
-  "caldav": { "protocolTests": true, "realProviderAccountConnected": false },
+  "status": "Code verified; publication recorded separately in pull request",
+  "rea": {
+    "evidence": "Official public help pages observed with REA 6.4",
+    "authenticatedVendorTesting": false
+  },
+  "localBrowser": {
+    "groups": 35,
+    "pageErrors": 0
+  },
+  "caldav": {
+    "protocolTests": true,
+    "realProviderAccountConnected": false
+  },
   "paidAiCalls": "Not configured for demo accounts",
-  "dataPolicy": "Additive migrations; preserve existing accounts, secrets and business records"
+  "dataPolicy": "Additive migrations; preserve existing accounts, secrets and business records",
+  "regression": {
+    "success": true,
+    "passed": 844,
+    "failed": 0,
+    "skipped": 2,
+    "testFiles": 93,
+    "baseline": "extensions-linux-tests.json",
+    "retest": "extensions-final-retest.json",
+    "note": "Full source suite, followed by final two-file retest after updating deployment filesystem mocks and bounded tracing. Original reports retained."
+  },
+  "linuxProductionBuild": true,
+  "typecheck": true,
+  "eslint": {
+    "errors": 0,
+    "warnings": 3
+  }
 }
