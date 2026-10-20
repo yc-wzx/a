@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-*/
 /out/
 
 # production
@@ -50,3 +51,4 @@ next-env.d.ts
 .release.json
 .hostname.json
 backups/
+/.data/

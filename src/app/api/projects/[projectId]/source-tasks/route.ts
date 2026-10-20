@@ -1,0 +1,7 @@
+import { auth } from "@/lib/auth";
+import { AppError, ForbiddenError } from "@/lib/errors";
+import { createTaskFromSource, getTaskOrigin } from "@/lib/source-tasks";
+export const dynamic="force-dynamic";
+type Context={params:Promise<{projectId:string}>};
+export async function GET(request:Request,context:Context){const session=await auth();if(!session?.user)return Response.json({error:"请先登录"},{status:401});try{return Response.json(await getTaskOrigin(session.user.id,(await context.params).projectId,new URL(request.url).searchParams.get("taskId")??""),{headers:{"Cache-Control":"private, no-store"}});}catch(error){return Response.json({error:error instanceof AppError?error.message:"来源不可用"},{status:403});}}
+export async function POST(request:Request,context:Context){const session=await auth();if(!session?.user)return Response.json({error:"请先登录"},{status:401});const origin=request.headers.get("origin");if(!origin||![new URL(request.url).origin,process.env.AUTH_URL&&new URL(process.env.AUTH_URL).origin,process.env.AGILECAMPUS_URL&&new URL(process.env.AGILECAMPUS_URL).origin].includes(origin))return Response.json({error:"没有权限"},{status:403});try{return Response.json(await createTaskFromSource(session.user.id,(await context.params).projectId,await request.json()));}catch(error){return Response.json({error:error instanceof AppError?error.message:"创建失败，请核对内容"},{status:error instanceof ForbiddenError?403:400});}}

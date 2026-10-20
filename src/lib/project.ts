@@ -14,6 +14,7 @@ import {
 import { AppError, ConflictError, ForbiddenError } from "./errors";
 import { getTeamMembership, requireTeamRole } from "./team";
 import { PROJECT_TEMPLATES } from "./project-templates";
+import { teamManagementSettings } from "@/db/team-management-schema";
 
 const createProjectSchema = z
   .object({
@@ -56,6 +57,7 @@ export async function createProject(
     .update(JSON.stringify({ actorId, teamId, ...content }))
     .digest("hex");
   return db.transaction(async (tx) => {
+    await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, teamId)).for("update");
     const [member] = await tx
       .select()
       .from(teamMembers)
@@ -64,6 +66,8 @@ export async function createProject(
       )
       .for("share");
     if (member?.role !== "admin") throw new ForbiddenError();
+    const [teamSettings] = await tx.select().from(teamManagementSettings).where(eq(teamManagementSettings.teamId, teamId));
+    if (teamSettings?.archivedAt) throw new AppError("团队已归档，请先恢复团队再创建项目");
     if (requestId) {
       // Serialize identical request keys before creating anything, including milestones.
       await tx.execute(
@@ -139,10 +143,15 @@ export async function updateProject(
   }).safeParse(patch);
   if (!parsed.success) throw new AppError(parsed.error.issues[0].message);
   return db.transaction(async tx => {
+    const [existing] = await tx.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId));
+    if (!existing) throw new ForbiddenError();
+    await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, existing.teamId)).for("update");
     const [project] = await tx.select().from(projects).where(eq(projects.id, projectId)).for("update");
     if (!project) throw new ForbiddenError();
     const [member] = await tx.select().from(teamMembers).where(and(eq(teamMembers.teamId, project.teamId), eq(teamMembers.userId, actorId))).for("share");
     if (member?.role !== "admin") throw new ForbiddenError();
+    const [teamSettings] = await tx.select().from(teamManagementSettings).where(eq(teamManagementSettings.teamId, project.teamId));
+    if (teamSettings?.archivedAt) throw new AppError("团队已归档，请先恢复团队再修改项目");
     if (expectedVersion && expectedVersion !== projectVersion(project)) throw new ConflictError("项目已被其他人修改，请刷新后重试");
     const next = { ...project, ...parsed.data };
     if (next.startDate && next.endDate && next.startDate > next.endDate) throw new AppError("结束日期不能早于开始日期");

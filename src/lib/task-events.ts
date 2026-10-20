@@ -5,6 +5,7 @@ import { recordProjectActivity } from "./activity";
 import { notifyTaskAssigned } from "./task-notifications";
 import { recordNotificationIntent } from "./notification";
 import { notifyTaskWatchers } from "./task-watching";
+import { captureIterationTrend } from "./iteration-trend";
 
 type Task = typeof tasks.$inferSelect;
 const fields = [
@@ -25,6 +26,7 @@ export async function recordTaskMutation(
   before: Task | null,
   task: Task,
 ) {
+  if (task.sprintId && !task.parentTaskId && (!before || before.status !== task.status)) await captureIterationTrend(tx,task.sprintId);
   const occurredAt = task.updatedAt.toISOString();
   let iterationId = task.sprintId;
   if (task.parentTaskId) {

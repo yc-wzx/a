@@ -3,6 +3,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { db } from "@/db";
 import { teamMembers, teams, users, type TeamRole } from "@/db/schema";
+import { teamJoinRequests, teamManagementSettings } from "@/db/team-management-schema";
 import { AppError, ForbiddenError, isUniqueViolation } from "./errors";
 
 export async function createTeam(userId: string, name: string) {
@@ -21,21 +22,26 @@ export async function createTeam(userId: string, name: string) {
 }
 
 export async function joinTeam(userId: string, inviteCode: string) {
-  const [team] = await db.select().from(teams).where(eq(teams.inviteCode, inviteCode));
-  if (!team) throw new AppError("邀请码无效");
-
-  const [existing] = await db
-    .select({ id: teamMembers.id })
-    .from(teamMembers)
-    .where(and(eq(teamMembers.teamId, team.id), eq(teamMembers.userId, userId)));
-  if (existing) throw new AppError("已在该团队中");
-
   try {
-    const [member] = await db
-      .insert(teamMembers)
-      .values({ teamId: team.id, userId, role: "student" })
-      .returning();
-    return member;
+    return await db.transaction(async tx => {
+      const [team] = await tx.select().from(teams).where(eq(teams.inviteCode, inviteCode.trim())).for("update");
+      if (!team) throw new AppError("邀请码无效");
+      const [settings] = await tx.select().from(teamManagementSettings).where(eq(teamManagementSettings.teamId, team.id));
+      if (settings?.archivedAt) throw new AppError("团队已归档，暂不接受新成员");
+      if (settings?.inviteEnabled === false) throw new AppError("团队邀请已关闭，请联系管理员");
+      if (settings?.inviteExpiresAt && settings.inviteExpiresAt.getTime() <= Date.now()) throw new AppError("邀请码已过期，请向管理员获取新邀请码");
+      const [existing] = await tx.select({ id: teamMembers.id }).from(teamMembers).where(and(eq(teamMembers.teamId, team.id), eq(teamMembers.userId, userId)));
+      if (existing) throw new AppError("已在该团队中");
+      if (settings?.requireApproval) {
+        const [request] = await tx.insert(teamJoinRequests).values({ teamId: team.id, userId }).onConflictDoUpdate({
+          target: [teamJoinRequests.teamId, teamJoinRequests.userId],
+          set: { status: "pending", createdAt: new Date(), reviewedAt: null, reviewedById: null },
+        }).returning();
+        return { ...request, pendingApproval: true as const };
+      }
+      const [member] = await tx.insert(teamMembers).values({ teamId: team.id, userId, role: "student" }).returning();
+      return member;
+    });
   } catch (e) {
     // 查重与插入之间的并发窗口：另一请求已抢先加入，由 DB 唯一约束兜底
     if (isUniqueViolation(e)) throw new AppError("已在该团队中");
@@ -79,6 +85,8 @@ export async function updateMemberRole(
   if (!z.enum(["admin", "teacher", "student"]).safeParse(role).success) throw new AppError("角色无效");
   return db.transaction(async tx => {
     await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, teamId)).for("update");
+    const [settings] = await tx.select().from(teamManagementSettings).where(eq(teamManagementSettings.teamId, teamId));
+    if (settings?.archivedAt) throw new AppError("团队已归档，请先恢复团队");
     const members = await tx.select().from(teamMembers).where(eq(teamMembers.teamId, teamId)).for("update");
     if (members.find(m => m.userId === actorId)?.role !== "admin") throw new ForbiddenError();
     const target = members.find(m => m.userId === targetUserId);
@@ -97,6 +105,8 @@ export async function updateMemberRole(
 export async function removeTeamMember(actorId: string, teamId: string, targetUserId: string) {
   return db.transaction(async tx => {
     await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, teamId)).for("update");
+    const [settings] = await tx.select().from(teamManagementSettings).where(eq(teamManagementSettings.teamId, teamId));
+    if (settings?.archivedAt) throw new AppError("团队已归档，请先恢复团队");
     const members = await tx.select().from(teamMembers).where(eq(teamMembers.teamId, teamId)).for("update");
     const actor = members.find(m => m.userId === actorId), target = members.find(m => m.userId === targetUserId);
     if (!actor || (actor.role !== "admin" && actorId !== targetUserId)) throw new ForbiddenError();

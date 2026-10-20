@@ -1,0 +1,1 @@
+ALTER TABLE "project_attachments" ADD COLUMN "deleted_at" timestamp with time zone;

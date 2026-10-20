@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { submitTaskOutcomeAction } from "@/app/(app)/projects/[projectId]/tasks/outcome-actions";
 import { newRequestId } from "@/lib/request-id";
+import { ProjectAttachments } from "@/components/attachments/project-attachments";
 export function TaskOutcome({ projectId, taskId, title, canWrite, onSaved, onDirtyChange }: { projectId: string; taskId: string; title: string; canWrite: boolean; onSaved?: () => void; onDirtyChange?: (value: boolean) => void }) {
   const [note, setNote] = useState(""), [url, setUrl] = useState(""), [pending, setPending] = useState(false), [error, setError] = useState("");
   const [submitted, setSubmitted] = useState<string | null>(null), request = useRef(newRequestId());
@@ -11,7 +12,7 @@ export function TaskOutcome({ projectId, taskId, title, canWrite, onSaved, onDir
     {!canWrite ? <p className="text-sm">当前仅可查看成果。<Link href={`/projects/${projectId}/deliverables`} className="text-primary">查看成果记录</Link></p> : submitted ? <div role="status" className="space-y-3 rounded-xl bg-done/10 p-4"><p>成果已提交，等待审核。</p><Link className="text-primary underline" href={`/projects/${projectId}/deliverables`}>查看提交及审核记录</Link></div> : <form className="space-y-4" onSubmit={async e => { e.preventDefault(); if (pending) return; setPending(true); setError(""); try { const r = await submitTaskOutcomeAction(projectId, taskId, { requestId: request.current, note, url }); if (!r.ok) setError(r.error); else { setSubmitted(r.data.deliverableId); onSaved?.(); } } catch { setError("提交结果未确认，内容已保留，请重试"); } finally { setPending(false); } }}>
       <fieldset disabled={pending} className="space-y-4"><label className="block text-sm">完成说明<textarea aria-label="成果完成说明" rows={4} maxLength={10000} className="ac-field mt-2 w-full" placeholder="简述完成了什么，供老师和组员核对" value={note} onChange={e => { setNote(e.target.value); request.current = newRequestId(); }} /></label>
       <label className="block text-sm">成果链接<input type="url" aria-label="成果链接" className="ac-field mt-2 w-full" placeholder="文档、代码仓库或演示网址（可选）" value={url} onChange={e => { setUrl(e.target.value); request.current = newRequestId(); }} /></label>
-      <p className="text-xs text-ink-faint">已有文件可在任务资料中关联；需要提交文件时，可从<Link href={`/projects/${projectId}/deliverables`} className="text-primary underline">成果区</Link>选择已有资料。</p>
+      <ProjectAttachments projectId={projectId} targetType="task" targetId={taskId} canUpload={!pending} onUploaded={item=>{setUrl(new URL(item.href,location.origin).href);request.current=newRequestId();}} />
       {error && <p role="alert" className="text-sm text-high">{error}</p>}<button className="ac-btn" disabled={pending || (!note.trim() && !url.trim())}>{pending ? "提交中…" : "提交审核"}</button></fieldset>
     </form>}
   </div>;

@@ -6,6 +6,8 @@ type CalendarBase = {
   projectName?: string;
   stale?: boolean;
   done?: boolean;
+  /** Present only for the current account's editable, non-external arrangements. */
+  move?: { kind: "event" | "work"; id: string; index?: number; revision: number };
 };
 export type CalendarEntry = CalendarBase & (
   | { when: "time"; source: "schedule" | "work"; startAt: string; endAt: string }

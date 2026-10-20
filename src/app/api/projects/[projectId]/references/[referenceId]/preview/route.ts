@@ -1,0 +1,5 @@
+import { auth } from "@/lib/auth";
+import { AppError,ForbiddenError } from "@/lib/errors";
+import { previewReference } from "@/lib/reference-preview";
+export const runtime="nodejs";export const dynamic="force-dynamic";
+export async function GET(request:Request,{params}:{params:Promise<{projectId:string;referenceId:string}>}){const session=await auth();if(!session?.user)return Response.json({error:"请先登录"},{status:401});try{const p=await params,result=await previewReference(session.user.id,p.projectId,p.referenceId,new URL(request.url).searchParams.has("pdf"));return result.pdf?new Response(new Uint8Array(result.pdf),{headers:{"Content-Type":"application/pdf","Content-Disposition":"inline","Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"default-src 'none'; frame-ancestors 'self'"}}):Response.json(result,{headers:{"Cache-Control":"private, no-store"}});}catch(e){return Response.json({error:e instanceof AppError?e.message:"无法读取公开预览，请打开原链接查看"},{status:e instanceof ForbiddenError?403:400});}}

@@ -2,6 +2,7 @@ import * as Y from "yjs";
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate, removeAwarenessStates } from "y-protocols/awareness";
 import type { DocumentPermission, DocumentSyncResult } from "@/contracts/documents";
 import { documentRequest, DocumentRequestError } from "./http";
+import { draftKey, saveLocalDocumentDraft, removeLocalDocumentDraft, removeRecoveredDraftIfUnchanged, type LocalDraftScope, type LocalDocumentDraft } from "./local-drafts";
 
 export function encodeBinary(value: Uint8Array): string {
   let binary = "";
@@ -19,6 +20,7 @@ export type SyncSnapshot = {
   pending: boolean;
   error?: string;
   presence: { userId: string; name: string }[];
+  recoveryError?: string;
 };
 
 /** One request at a time; acknowledge only the updates included in that request. */
@@ -36,7 +38,10 @@ export class DocumentSyncProvider {
   private snapshot: SyncSnapshot;
   private listeners = new Set<(state: SyncSnapshot) => void>();
   private events = new Map<string, Set<() => void>>();
-  constructor(private url: string, state: string, readonly epoch: number, revision: number, permission: DocumentPermission) {
+  private recovery?: { scope: LocalDraftScope; preview: () => string };
+  private recoveredDrafts: LocalDocumentDraft[] = [];
+  constructor(private url: string, state: string, readonly epoch: number, revision: number, permission: DocumentPermission, recovery?: { scope: LocalDraftScope; preview: () => string }) {
+    this.recovery = recovery;
     this.doc = new Y.Doc();
     if (state) Y.applyUpdate(this.doc, decodeBinary(state), "remote");
     this.awareness = new Awareness(this.doc);
@@ -46,6 +51,7 @@ export class DocumentSyncProvider {
   private onUpdate = (update: Uint8Array, origin: unknown) => {
     if (origin === "remote" || this.destroyed) return;
     this.updates.push(update);
+    this.persistPending();
     this.publish({ pending: true, status: this.blocked ? this.snapshot.status : "saving" });
   };
   subscribe(listener: (state: SyncSnapshot) => void) {
@@ -63,6 +69,38 @@ export class DocumentSyncProvider {
     this.listeners.forEach((listener) => listener(this.snapshot));
   }
   getSnapshot() { return this.snapshot; }
+  updateRecoveryPreview(text: string) {
+    if (!this.recovery) return;
+    this.recovery.preview = () => text;
+    this.persistPending();
+  }
+  private persistPending() {
+    if (!this.recovery) return;
+    const key = draftKey(this.recovery.scope, this.epoch, this.sessionId);
+    try {
+      // Some browsers throw on access to the localStorage property itself when
+      // site data is disabled, before setItem can be attempted.
+      if (typeof localStorage === "undefined") return;
+      if (!this.updates.length) { removeLocalDocumentDraft(key); return; }
+      saveLocalDocumentDraft({ version: 1, ...this.recovery.scope, key, sessionId: this.sessionId, epoch: this.epoch,
+        revision: this.snapshot.revision, update: encodeBinary(Y.mergeUpdates(this.updates)), preview: this.recovery.preview().slice(0, 200000), savedAt: Date.now() });
+      if (this.snapshot.recoveryError) this.publish({ recoveryError: undefined });
+    } catch (failure) {
+      this.publish({ recoveryError: failure instanceof Error ? failure.message : "浏览器无法保存恢复副本，请复制或下载正文。" });
+    }
+  }
+  /** Caller must freshly check identity, edit access, project and epoch first. */
+  restoreLocalDraft(draft: LocalDocumentDraft) {
+    if (!this.recovery || Object.entries(this.recovery.scope).some(([key, value]) => draft[key as keyof LocalDraftScope] !== value)
+      || draft.epoch !== this.epoch || this.blocked || this.snapshot.permission !== "edit") throw new Error("草稿的账号、文档版本或编辑权限已改变，不能恢复。");
+    Y.applyUpdate(this.doc, decodeBinary(draft.update), "recovery");
+    this.recoveredDrafts.push(draft);
+    // The previous request might already have committed before its response was
+    // lost. Replaying an already-known Yjs delta is safe and still needs ack.
+    if (!this.updates.length) this.updates.push(decodeBinary(draft.update));
+    this.persistPending();
+    this.publish({ pending: true, status: "saving" });
+  }
   start() {
     if (this.timer || this.destroyed) return;
     void this.sync().catch(() => {});
@@ -81,7 +119,7 @@ export class DocumentSyncProvider {
     try {
       const result = await documentRequest<DocumentSyncResult>(this.url, {
         method: "POST",
-        body: JSON.stringify({ sessionId: this.sessionId, epoch: this.epoch,
+        body: JSON.stringify({ sessionId: this.sessionId, epoch: this.epoch, ...(this.recovery ? { expectedActorId: this.recovery.scope.actorId } : {}),
           stateVector: encodeBinary(Y.encodeStateVector(this.doc)), update,
           awareness: encodeBinary(encodeAwarenessUpdate(this.awareness, [this.doc.clientID])) }),
       });
@@ -95,6 +133,10 @@ export class DocumentSyncProvider {
       }
       if (result.update) Y.applyUpdate(this.doc, decodeBinary(result.update), "remote");
       if (update) this.updates.splice(0, count);
+      if (!this.updates.length && update) {
+        for (const draft of this.recoveredDrafts.splice(0)) { try { removeRecoveredDraftIfUnchanged(draft); } catch { /* Keep a duplicate recovery entry if browser storage is unavailable. */ } }
+      }
+      this.persistPending();
       const activeClients = new Set<number>([this.doc.clientID]);
       for (const person of result.presence) {
         if (person.sessionId === this.sessionId || !person.awareness) continue;
@@ -132,6 +174,7 @@ export class DocumentSyncProvider {
   }
   destroy() {
     if (this.destroyed) return;
+    this.persistPending();
     this.destroyed = true;
     if (this.timer) clearInterval(this.timer);
     this.doc.off("update", this.onUpdate);

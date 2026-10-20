@@ -16,6 +16,7 @@ import { DocumentAnchorHighlight, documentAnchorHighlightKey } from "./anchor-hi
 import { InteractiveDocumentReference, InteractiveDocumentToggle } from "./knowledge-extensions";
 import { DocumentReferencePicker } from "./document-reference-picker";
 import { moveDocumentBlock } from "./block-movement";
+import { snapshotText } from "./document-snapshot";
 import "./documents.css";
 
 export type DocumentEditorHandle = { editor: Editor; provider: DocumentSyncProvider };
@@ -54,7 +55,8 @@ export default function DocumentEditor(props: DocumentEditorProps) {
   useEffect(() => {
     // Create and dispose the external Yjs resource in an effect so Strict Mode
     // never leaks an Awareness interval from a discarded render.
-    const resource = new DocumentSyncProvider(`/api/projects/${initial.projectId}/documents/${initial.id}/sync`, initial.state, initial.epoch, initial.revision, initial.permission);
+    const resource = new DocumentSyncProvider(`/api/projects/${initial.projectId}/documents/${initial.id}/sync`, initial.state, initial.epoch, initial.revision, initial.permission,
+      { scope: { actorId: initial.actorId, projectId: initial.projectId, documentId: initial.id }, preview: () => snapshotText(initial.content) });
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setProvider(resource);
     return () => resource.destroy();
@@ -101,6 +103,7 @@ function DocumentEditorCore({ initial, editable, canComment, onReady, onSync, on
     editorProps: { attributes: { class: "document-prose", "aria-label": "文档正文编辑器", "data-document-editor": "true" },
       handleKeyDown: (_view, event) => keyHandler.current(event) },
     onUpdate: ({ editor: current }) => {
+      provider.updateRecoveryPreview(current.getText());
       const { $from } = current.state.selection;
       if (current.isEditable && $from.parent.type.name !== "codeBlock" && current.state.selection.empty && $from.parent.textBetween(0, $from.parentOffset).endsWith("[[")) setReferenceRange({ from: $from.pos - 2, to: $from.pos, prefix: "[[" });
       const next = findSlashRange($from.parent.textBetween(0, $from.parentOffset), $from.pos, current.state.selection.empty, $from.parent.type.name);

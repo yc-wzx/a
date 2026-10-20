@@ -6,6 +6,7 @@ import { NotFoundError, ForbiddenError } from "@/lib/errors";
 import { getIterationDetail, getIterationHistory, listProjectIterations } from "@/lib/iteration";
 import { listBacklog } from "@/lib/task-contract";
 import { IterationDetailView } from "./iteration-detail-view";
+import { IterationTrend } from "@/components/projects/iteration-trend";
 
 // C / P0-P1：单轮迭代页。任务增删、开始、结束（含未完成去向）、历史快照与复盘都在这里。
 //
@@ -76,6 +77,7 @@ export default async function IterationDetailPage({
         </div>
       </header>
 
+      <IterationTrend actorId={actorId} projectId={projectId} iterationId={iterationId} />
       <IterationDetailView
         projectId={projectId}
         canWrite={role === "admin" || role === "student"}

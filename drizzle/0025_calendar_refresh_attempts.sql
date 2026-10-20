@@ -1,0 +1,1 @@
+ALTER TABLE "calendar_connections" ADD COLUMN "last_attempt_at" timestamp with time zone;

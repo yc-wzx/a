@@ -3,6 +3,9 @@ import { scanAndRecordDueReminders } from "@/lib/notification-reminders";
 import { dispatchExternalNotifications } from "@/lib/notification";
 import { dispatchDeliverableEvents } from "@/lib/deliverable-events";
 import { handleDeliverableEvent } from "@/lib/deliverable-sink";
+import { captureActiveIterationTrends } from "@/lib/iteration-trend";
+import { cleanupAttachmentFiles } from "@/lib/attachments";
+import { runCalendarRefreshBatch } from "@/lib/schedule/calendar-connections";
 
 // 定时提醒端点：外部调度每日打一次。CRON_SECRET 为唯一护栏。
 export async function POST(req: Request) {
@@ -19,6 +22,7 @@ export async function POST(req: Request) {
     const outbox = await dispatchDeliverableEvents(handleDeliverableEvent);
     const reminders = await scanAndRecordDueReminders();
     const external = await dispatchExternalNotifications();
+    const [trends,attachmentCleanup,calendars] = await Promise.allSettled([captureActiveIterationTrends(),cleanupAttachmentFiles(),runCalendarRefreshBatch()]);
     return NextResponse.json({
       notified: external.sent,
       tasksScanned: reminders.scanned,
@@ -26,6 +30,9 @@ export async function POST(req: Request) {
       external,
       outboxDelivered: outbox.delivered,
       outboxFailed: outbox.failed,
+      trends: trends.status === "fulfilled" ? trends.value : null,
+      attachmentCleanup: attachmentCleanup.status === "fulfilled" ? attachmentCleanup.value : null,
+      calendars: calendars.status === "fulfilled" ? calendars.value : {failed:true},
     });
   } catch (e) {
     console.error("[/api/cron/reminders]", e);

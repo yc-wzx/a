@@ -312,10 +312,11 @@ function evidenceView(row: EvidenceRow) {
   };
 }
 
-export async function listDeliverableEvidence(
+async function queryDeliverableEvidence(
   actorId: string,
   projectId: string,
   input: DeliverableEvidenceOptions = {},
+  exportLimit?: number,
 ) {
   parse(uuid, actorId);
   parse(uuid, projectId);
@@ -335,17 +336,24 @@ export async function listDeliverableEvidence(
     );
     const rows =
       await tx.execute<EvidenceRow>(sql`${evidenceCte(projectId)} select e.* from evidence e ${filter}
-      order by e."occurredAt" desc, e.kind asc, e.id asc limit ${options.limit} offset ${options.offset}`);
+      order by e."occurredAt" desc, e.kind asc, e.id asc limit ${exportLimit ?? options.limit} offset ${exportLimit ? 0 : options.offset}`);
     return {
       ...page(
         rows.map(evidenceView),
         total.count,
-        options.offset,
-        options.limit,
+        exportLimit ? 0 : options.offset,
+        exportLimit ?? options.limit,
       ),
       timezone: "Asia/Shanghai" as const,
     };
   }, readSnapshot);
+}
+
+export async function listDeliverableEvidence(actorId:string,projectId:string,input:DeliverableEvidenceOptions = {}) {
+  return queryDeliverableEvidence(actorId,projectId,input);
+}
+export async function exportDeliverableEvidenceRows(actorId:string,projectId:string,input:DeliverableEvidenceOptions = {}) {
+  return queryDeliverableEvidence(actorId,projectId,input,1000);
 }
 
 export async function getDeliverableEvidenceRecord(

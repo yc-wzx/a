@@ -32,6 +32,7 @@ export function TeamForms() {
         <p className="text-xs leading-5 text-ink-soft">向团队成员获取邀请码。指导教师加入后，由管理员设置角色。</p>
         <label className="block text-sm">团队邀请码<input name="inviteCode" required placeholder="填写团队邀请码" className="ac-field mt-1" /></label>
         {joinState?.error && <p role="alert" className="text-sm text-high">{joinState.error}</p>}
+        {joinState?.success && <p role="status" className="text-sm text-low">{joinState.success}</p>}
         <button disabled={joining} className="ac-btn">
           {joining ? "加入中…" : "确认加入"}
         </button>

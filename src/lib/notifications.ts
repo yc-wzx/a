@@ -29,6 +29,7 @@ import {
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { pageResult } from "./pagination";
 import { hashRequest } from "./write-request";
+import { projectDocuments, documentComments } from "@/db/documents-schema";
 
 const uuid = z.uuid();
 const filterSchema = z.strictObject({
@@ -74,6 +75,16 @@ function visible(actorId: string, projectId?: string) {
     sql`exists (select 1 from ${projects} p join ${teamMembers} m on m.team_id = p.team_id
       where p.id = ${notifications.projectId} and m.user_id = ${actorId}
       and (${notifications.type} <> 'deliverable.submitted' or m.role in ('admin', 'teacher')))`,
+    // A document title is private data too: filter before counts/pagination/read,
+    // not just when somebody follows the notification's link.
+    sql`(${notifications.type} not like 'document.%' or exists (
+      select 1 from project_documents d where d.id::text=${notifications.metadata}->>'documentId'
+      and d.project_id=${notifications.projectId} and d.deleted_at is null
+      and (d.owner_id=${actorId} or d.visibility='project' or exists (
+        select 1 from document_grants g where g.document_id=d.id and g.user_id=${actorId}))
+      and (${notifications.metadata}->>'commentId' is null or exists (
+        select 1 from document_comments c where c.id::text=${notifications.metadata}->>'commentId'
+        and c.document_id=d.id and c.deleted_at is null))))`,
   );
 }
 async function requireProject(actorId: string, projectId: string) {
@@ -162,7 +173,25 @@ export async function recordNotificationIntent(
   return { createdCount: inserted.length };
 }
 type Row = typeof notifications.$inferSelect;
-async function item(row: Row): Promise<NotificationItem> {
+async function item(row: Row): Promise<NotificationItem | null> {
+  if (row.type.startsWith("document.")) {
+    const documentId = typeof row.metadata?.documentId === "string" ? row.metadata.documentId : "";
+    const [document] = await db.select({ id: projectDocuments.id }).from(projectDocuments)
+      .where(and(sql`${projectDocuments.id}::text=${documentId}`, eq(projectDocuments.projectId, row.projectId), isNull(projectDocuments.deletedAt),
+        sql`exists(select 1 from projects p join team_members m on m.team_id=p.team_id where p.id=${row.projectId} and m.user_id=${row.recipientId})`,
+        sql`(${projectDocuments.ownerId}=${row.recipientId} or ${projectDocuments.visibility}='project' or exists(select 1 from document_grants g where g.document_id=${projectDocuments.id} and g.user_id=${row.recipientId}))`));
+    // Recheck while building the DTO too: a revocation may have happened after
+    // the paged inbox query. Do not return even an old private title in that gap.
+    if (!document) return null;
+    const commentId = typeof row.metadata?.commentId === "string" ? row.metadata.commentId : null;
+    const [comment] = commentId ? await db.select({ id: documentComments.id }).from(documentComments)
+      .where(and(sql`${documentComments.id}::text=${commentId}`, sql`${documentComments.documentId}::text=${documentId}`, isNull(documentComments.deletedAt))) : [];
+    const available = !!document && (!commentId || !!comment);
+    return { id: row.id, eventKey: row.eventKey, recipientId: row.recipientId, projectId: row.projectId, type: row.type,
+      title: row.title, summary: available ? row.summary : "来源已删除", createdAt: row.createdAt.toISOString(), readAt: row.readAt?.toISOString() ?? null,
+      sourceRef: { sourceKind: "activity", sourceId: row.sourceId, projectId: row.projectId, sourceHref: available ? row.href : null,
+        evidenceKey: `notification:${row.id}`, availability: available ? "available" : "deleted" } };
+  }
   const tables = {
     task: tasks,
     iteration: iterations,
@@ -235,8 +264,9 @@ export async function listMyNotifications(
     .orderBy(desc(notifications.createdAt), asc(notifications.id))
     .limit(data.limit)
     .offset(data.offset);
+  const items = (await Promise.all(rows.map(item))).filter((entry): entry is NotificationItem => entry !== null);
   return pageResult(
-    await Promise.all(rows.map(item)),
+    items,
     count.total,
     data.offset,
     data.limit,

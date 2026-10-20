@@ -7,6 +7,7 @@ import { AppError, ForbiddenError } from "./errors";
 import { getProjectForUser } from "./project";
 import { createTask } from "./task";
 import { recordDeliverableEvent } from "./deliverable-events";
+import { publishDeliverableAttachments } from "./attachments";
 
 export class DeliverableError extends AppError {
   constructor(public readonly code: "VALIDATION" | "CONFLICT", message: string) {
@@ -194,6 +195,7 @@ export async function submitDeliverable(actorId: string, projectId: string, deli
     const [submitted] = await tx.update(deliverables).set({
       ...content, workingCopy: null, status: "submitted", revision: row.revision + 1, updatedAt: submittedAt, submittedAt,
     }).where(eq(deliverables.id, row.id)).returning();
+    await publishDeliverableAttachments(tx, projectId, row.id, content.url, content.description);
     await recordDeliverableEvent(tx, { projectId, actorId, type: "deliverable.submitted",
       eventKey: `deliverable.submitted:${version.id}`, payload: { deliverableId: row.id, versionId: version.id }, recipients: "reviewers" });
     return { deliverable: view(submitted, actorId, role), versionId: version.id, replayed: false };

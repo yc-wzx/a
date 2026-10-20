@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { listProjectDeliverables } from "@/lib/deliverable";
 import { DELIVERABLE_LABELS } from "@/lib/deliverable-labels";
 import { getProjectForUser } from "@/lib/project";
+import { CsvDownload } from "@/components/csv-download";
 
 /** 列表项的状态说明：把 D 的状态机翻译成学生看得懂的一句话。 */
 const STATUS_HINT: Record<string, string> = {
@@ -42,6 +43,7 @@ export default async function DeliverablesPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-semibold text-ink">阶段成果</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <CsvDownload projectId={projectId} kind="deliverables" />
           {/* 答辩/过程证据：相关页面的操作入口，不增加一级菜单 */}
           <Link
             href={`/projects/${projectId}/evidence`}
@@ -61,7 +63,7 @@ export default async function DeliverablesPage({
       </div>
 
       <p className="text-xs text-ink-faint">
-        只保存外部链接（报告 / PPT / 视频 / 问卷 / 代码 / 原型 / 演示 / 其他），不上传本地文件；
+        支持外部链接与本地附件（报告 / PPT / 图片等）；
         草稿仅本人和团队管理员可见，正式提交后对本项目成员开放。
       </p>
 

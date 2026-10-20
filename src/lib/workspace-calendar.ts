@@ -24,10 +24,10 @@ export async function getWorkspaceCalendar(actorId: string, input: { startDate: 
       .where(and(eq(teamMembers.userId, actorId), eq(projects.status, "active")))
       .for("share", { of: [projects, teamMembers] });
     const ids = visible.map(p => p.id), names = new Map(visible.map(p => [p.id, p.name]));
-    const events = await tx.select({ id: personalScheduleEvents.id, title: personalScheduleEvents.title, startAt: personalScheduleEvents.startAt, endAt: personalScheduleEvents.endAt })
+    const events = await tx.select({ id: personalScheduleEvents.id, title: personalScheduleEvents.title, startAt: personalScheduleEvents.startAt, endAt: personalScheduleEvents.endAt, revision: personalScheduleEvents.revision, source: personalScheduleEvents.source })
       .from(personalScheduleEvents).where(and(eq(personalScheduleEvents.userId, actorId), lt(personalScheduleEvents.startAt, to), gt(personalScheduleEvents.endAt, from)))
       .orderBy(asc(personalScheduleEvents.startAt), asc(personalScheduleEvents.id)).limit(LIMIT + 1);
-    const entries: CalendarEntry[] = events.slice(0, LIMIT).map(e => ({ id: `schedule:${e.id}`, source: "schedule", when: "time", title: e.title, startAt: e.startAt.toISOString(), endAt: e.endAt.toISOString(), href: `/schedule?from=${range.startDate}&to=${range.endDate}` }));
+    const entries: CalendarEntry[] = events.slice(0, LIMIT).map(e => ({ id: `schedule:${e.id}`, source: "schedule", when: "time", title: e.title, startAt: e.startAt.toISOString(), endAt: e.endAt.toISOString(), href: `/schedule?from=${range.startDate}&to=${range.endDate}`, ...(["manual", "emergency"].includes(e.source) ? { move: { kind: "event" as const, id: e.id, revision: e.revision } } : {}) }));
     let truncated = events.length > LIMIT;
     if (!ids.length) return { ...range, entries, truncated };
     const [due, stages, rounds, plans] = await Promise.all([
@@ -50,7 +50,7 @@ export async function getWorkspaceCalendar(actorId: string, input: { startDate: 
       for (const [index, block] of (p.items as WorkBlock[]).entries()) {
         const task = ownTasks.get(block.taskId);
         if (!task || task.projectId !== p.projectId || Date.parse(block.startAt) >= to.getTime() || Date.parse(block.endAt) <= from.getTime()) continue;
-        entries.push({ id: `work:${p.id}:${index}`, when: "time", source: "work", title: task.title, startAt: block.startAt, endAt: block.endAt, stale, projectName: names.get(p.projectId), href: `/projects/${p.projectId}?task=${task.id}` });
+        entries.push({ id: `work:${p.id}:${index}`, when: "time", source: "work", title: task.title, startAt: block.startAt, endAt: block.endAt, stale, projectName: names.get(p.projectId), href: `/projects/${p.projectId}?task=${task.id}`, ...(!stale ? { move: { kind: "work" as const, id: p.id, index, revision: p.revision } } : {}) });
       }
     }
     return { ...range, entries, truncated };

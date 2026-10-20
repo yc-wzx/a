@@ -1,5 +1,6 @@
 "use client";
 import { TaskLink } from "@/components/tasks/task-link";
+import { SourceTaskButton } from "@/components/tasks/source-task";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -564,6 +565,7 @@ export function IterationDetailView({
       {locked && (
         <section className="ac-card space-y-3">
           <h2 className="font-medium text-ink">复盘</h2>
+          {canWrite && detail.retrospective && <SourceTaskButton projectId={projectId} sourceType="retrospective" sourceId={detail.retrospective.id} revision={String(detail.retrospective.revision)} text={[detail.retrospective.problems,detail.retrospective.nextActions].filter(Boolean).join("\n")} />}
           {canWrite ? (
             <form
               action={handleSaveRetro}

@@ -435,6 +435,10 @@ export function ManualForm({ requestId }: { requestId: string }) {
     </form>
   );
 }
+export function ExternalEventSharing({ event,requestId }: { event: ScheduleEventInput & { id: string; revision: number }; requestId: string }) {
+  const { pending,error,onSubmit } = useScheduleWrite(() => changeScheduleEventAction(event.id,{ requestId,expectedRevision: event.revision,event: { title: event.title,startAt: event.startAt,endAt: event.endAt,shareBusy: !event.shareBusy } }));
+  return <form onSubmit={onSubmit} className="space-y-2"><p className="text-xs text-ink-soft">来源日程名称始终仅本人可见。你可选择向「共享设置」中已选团队显示模糊忙碌时间。</p><button className="ac-btn-ghost text-xs" disabled={pending}>{pending ? "保存中…" : event.shareBusy ? "停止共享此项忙碌时间" : "允许共享此项忙碌时间"}</button><Feedback error={error} /></form>;
+}
 export function EventControls({
   event,
   requestId,

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { DbTx } from "@/db";
 import {
@@ -18,6 +18,8 @@ import { getProjectForUser } from "./project";
 import { notifyTaskAssigned, notifyTaskCompleted } from "./notify";
 import { recordTaskMutation } from "./task-events";
 import { lockTaskWriteAccess } from "./task-write-access";
+import { captureIterationTrend } from "./iteration-trend";
+import { projectAttachments } from "@/db/course-extensions-schema";
 
 // 任务写操作角色：admin + student（teacher 只读，设计文档 §5）
 export const TASK_WRITE_ROLES = ["admin", "student"];
@@ -197,7 +199,12 @@ export async function deleteTask(actorId: string, taskId: string) {
   const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
   if (!task) throw new AppError("任务不存在");
   await requireTaskWrite(actorId, task.projectId);
-  await db.delete(tasks).where(eq(tasks.id, taskId));
+  await db.transaction(async tx => {
+    await lockTaskWriteAccess(tx,actorId,task.projectId);
+    await tx.delete(tasks).where(eq(tasks.id, taskId));
+    await tx.update(projectAttachments).set({deletedAt:new Date()}).where(and(eq(projectAttachments.targetType,"task"),eq(projectAttachments.targetId,taskId),isNull(projectAttachments.publishedAt)));
+    await captureIterationTrend(tx,task.sprintId);
+  });
 }
 
 export type TaskLabel = { id: string; name: string; color: string };

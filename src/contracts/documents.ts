@@ -76,6 +76,7 @@ export type DocumentReferenceItem = { id: string; title: string; folder: string;
 export type DocumentRelations = { outgoing: DocumentReferenceItem[]; incoming: DocumentReferenceItem[] };
 export type DocumentPresence = { sessionId: string; userId: string; name: string; awareness: string | null };
 export type DocumentSyncInput = {
+  expectedActorId?: string;
   sessionId: string;
   epoch: number;
   stateVector?: string;
@@ -89,6 +90,16 @@ export type DocumentSyncResult = {
   permission: DocumentPermission;
   updatedAt: string;
   presence: DocumentPresence[];
+};
+
+export type DocumentConfirmation = {
+  round: null | {
+    id: string; epoch: number; revision: number; requestedAt: string;
+    stale: boolean; participants: { id: string; name: string; confirmedAt: string | null }[];
+  };
+  canRequest: boolean;
+  canConfirm: boolean;
+  candidates: { id: string; name: string }[];
 };
 
 // HTTP responses use the existing Result<T> envelope. Identity is always from
@@ -115,3 +126,6 @@ export type DocumentSyncResult = {
 // POST /:documentId/bookmark {bookmarked:boolean}; POST /:documentId/visit {}
 // POST /:documentId/create-task {requestId,expectedRevision,epoch,blockId,selection,title,assigneeId?,dueDate?,sharePrivateContent?}
 // POST /ask {question,documents:[{id,revision,epoch}]} -> DocumentAnswer, 1–3 current readable sources, personal model only.
+// GET /:documentId/confirmation -> DocumentConfirmation (current ACL, no hidden member counts)
+// POST same {requestId,expectedRevision,epoch,reviewerIds} -> {id}; edit permission only.
+// PATCH same {requestId,expectedRevision,epoch,roundId} -> {id,confirmedAt}; invited readable members only.
