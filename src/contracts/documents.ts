@@ -42,6 +42,7 @@ export type DocumentComment = {
   resolvedAt: string | null;
   createdAt: string;
   canDelete: boolean;
+  canEdit?: boolean;
 };
 export type DocumentVersion = {
   id: string;

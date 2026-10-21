@@ -1,5 +1,5 @@
 /** Guard SPA links, task switches, browser traversal and reload in desktop browsers. */
-export function installUnsavedChangesGuard(isDirty: () => boolean, confirmLeave: () => boolean, root: HTMLElement) {
+export function installUnsavedChangesGuard(isDirty: () => boolean, confirmLeave: () => boolean, root: HTMLElement, preserveTaskPreview = false) {
   let accepted = false;
   const allow = () => !isDirty() || accepted || (accepted = confirmLeave());
   const reset = () => { setTimeout(() => { accepted = false; }, 0); };
@@ -7,6 +7,8 @@ export function installUnsavedChangesGuard(isDirty: () => boolean, confirmLeave:
     if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
     if (!anchor || anchor.hasAttribute("download") || anchor.target === "_blank") return;
+    // Document task references keep this editor mounted beneath the preview.
+    if (preserveTaskPreview && anchor.hasAttribute("data-task-reference")) return;
     const next = new URL(anchor.href, location.href);
     if (next.pathname === location.pathname && next.search === location.search) return;
     if (!allow()) { event.preventDefault(); event.stopImmediatePropagation(); } else reset();
@@ -21,7 +23,7 @@ export function installUnsavedChangesGuard(isDirty: () => boolean, confirmLeave:
     if (navigation.hashChange || !event.cancelable || navigation.destination?.url === location.href) return;
     if (!allow()) event.preventDefault(); else reset();
   };
-  const taskChange = (event: Event) => { if (!allow()) event.preventDefault(); else reset(); };
+  const taskChange = (event: Event) => { if (preserveTaskPreview) return; if (!allow()) event.preventDefault(); else reset(); };
   const navigation = (window as Window & { navigation?: EventTarget }).navigation;
   const originalUrl = location.href, originalState = history.state;
   const pop = (event: PopStateEvent) => {

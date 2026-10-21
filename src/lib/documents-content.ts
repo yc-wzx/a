@@ -11,16 +11,17 @@ import type { DocumentNode } from "@/contracts/documents";
 import { ValidationError } from "./errors";
 import { knowledgeDocumentNodes } from "./document-nodes";
 
-const blocks = ["paragraph", "heading", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary"];
+const blocks = ["paragraph", "heading", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary", "documentAttachment"];
 const ids = Extension.create({ name: "documentBlockIds", addGlobalAttributes() {
   return [{ types: blocks, attributes: { id: { default: null } } }];
 } });
 export const documentSchema = getSchema([StarterKit.configure({ undoRedo: false }), Image, TableKit, TaskList, TaskItem, ids, ...knowledgeDocumentNodes()]);
-const nodes = new Set([...blocks, "doc", "text", "listItem", "taskItem", "tableRow", "tableCell", "tableHeader", "hardBreak", "toggleContent", "documentReference"]);
+const nodes = new Set([...blocks, "doc", "text", "listItem", "taskItem", "tableRow", "tableCell", "tableHeader", "hardBreak", "toggleContent", "documentReference", "documentMention", "documentTaskReference"]);
 const marks = new Set(["bold", "italic", "strike", "underline", "code", "link"]);
 export const EMPTY_DOCUMENT: DocumentNode = { type: "doc", content: [{ type: "paragraph" }] };
 export function safeDocumentUrl(value: unknown) {
   if (typeof value !== "string" || value.length > 2048) return false;
+  if (/^\/api\/attachments\/[0-9a-f-]{36}$/i.test(value)) return true;
   try { const u = new URL(value); return ["https:", "http:"].includes(u.protocol) && !u.username && !u.password && !/[\u0000-\u0020\u007f]/.test(value); } catch { return false; }
 }
 export function validateDocumentContent(input: unknown): DocumentNode {
@@ -39,6 +40,11 @@ export function validateDocumentContent(input: unknown): DocumentNode {
       if (n.type === "heading") { const level = Number(n.attrs.level); if (![1,2,3,4,5,6].includes(level)) throw new ValidationError("标题层级不正确"); a.level = level; }
       if (n.type === "documentCallout") { if (!["note", "question", "risk"].includes(String(n.attrs.kind ?? "note"))) throw new ValidationError("提示块类型不正确"); a.kind = n.attrs.kind ?? "note"; }
       if (n.type === "documentReference") { if (typeof n.attrs.documentId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(n.attrs.documentId)) throw new ValidationError("引用文档标识不正确"); a.documentId = n.attrs.documentId; }
+      if (["documentMention", "documentTaskReference", "documentAttachment"].includes(n.type)) {
+        const key = n.type === "documentMention" ? "userId" : n.type === "documentTaskReference" ? "taskId" : "attachmentId";
+        if (typeof n.attrs[key] !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(n.attrs[key]))) throw new ValidationError("文档引用标识不正确");
+        a[key] = n.attrs[key];
+      }
       if (n.type === "image") { if (!safeDocumentUrl(n.attrs.src)) throw new ValidationError("图片需要有效的 HTTP/HTTPS 链接"); a.src = n.attrs.src; for (const k of ["alt", "title"]) if (typeof n.attrs[k] === "string") a[k] = (n.attrs[k] as string).slice(0,500); }
       if (n.type === "taskItem") a.checked = Boolean(n.attrs.checked);
       if (n.type === "orderedList") a.start = Math.min(10000, Math.max(1, Number(n.attrs.start) || 1));
@@ -46,6 +52,7 @@ export function validateDocumentContent(input: unknown): DocumentNode {
       if (n.type === "tableCell" || n.type === "tableHeader") { for (const k of ["colspan", "rowspan"]) a[k] = Math.min(50, Math.max(1, Number(n.attrs[k]) || 1)); a.colwidth = Array.isArray(n.attrs.colwidth) ? n.attrs.colwidth.slice(0,50).map(v => Math.min(2000, Math.max(1, Number(v)||100))) : null; }
       result.attrs = a;
     }
+    if (["documentMention", "documentTaskReference", "documentAttachment"].includes(n.type) && !result.attrs?.[n.type === "documentMention" ? "userId" : n.type === "documentTaskReference" ? "taskId" : "attachmentId"]) throw new ValidationError("文档引用不能为空");
     if (n.type === "image" && !result.attrs?.src) throw new ValidationError("图片地址不能为空");
     if (n.type === "documentReference" && !result.attrs?.documentId) throw new ValidationError("引用文档不能为空");
     if (n.marks !== undefined) {
@@ -80,16 +87,22 @@ export function documentText(node: DocumentNode): string {
   if (node.type === "text") return node.text ?? "";
   if (node.type === "hardBreak") return "\n";
   if (node.type === "documentReference") return "[引用文档]";
+  if (node.type === "documentMention") return "[@成员]";
+  if (node.type === "documentTaskReference") return "[项目任务]";
+  if (node.type === "documentAttachment") return "[文档附件]";
   return (node.content ?? []).map(documentText).join(["paragraph", "heading"].includes(node.type) ? "" : "\n");
 }
 export function documentBlockExists(node: DocumentNode, id: string): boolean { return node.attrs?.id === id || (node.content ?? []).some(n => documentBlockExists(n,id)); }
 function escapeText(text: string) { return text.replace(/([\\`*_\[\]<>])/g,"\\$1"); }
-export function documentMarkdown(node: DocumentNode, reference?: (id: string) => string): string {
+export function documentMarkdown(node: DocumentNode, reference?: (id: string, kind?: string) => string): string {
   const children = (node.content ?? []).map(child => documentMarkdown(child, reference));
   if (node.type === "text") { let s = escapeText(node.text ?? ""); for (const m of node.marks ?? []) { if (m.type === "bold") s = `**${s}**`; else if (m.type === "italic") s = `*${s}*`; else if (m.type === "strike") s = `~~${s}~~`; else if (m.type === "code") s = "`" + (node.text??"").replace(/`/g,"\\`") + "`"; else if (m.type === "link") s = `[${s}](${String(m.attrs?.href).replace(/\)/g,"%29")})`; } return s; }
   const joined = children.join("");
   switch (node.type) {
     case "documentReference": return reference?.(String(node.attrs?.documentId)) ?? "[引用文档]";
+    case "documentMention": return reference?.(String(node.attrs?.userId), "member") ?? "[@成员]";
+    case "documentTaskReference": return reference?.(String(node.attrs?.taskId), "task") ?? "[项目任务不可用]";
+    case "documentAttachment": return reference?.(String(node.attrs?.attachmentId), "attachment") ?? "[文档附件不可用]";
     case "documentCallout": return `> **${({ note: "提示", question: "待确认", risk: "风险" } as Record<string, string>)[String(node.attrs?.kind ?? "note")]}**\n` + children.join("\n\n").split("\n").map(l => "> " + l).join("\n");
     case "documentToggle": return children.join("\n\n");
     case "toggleSummary": return "**" + joined + "**";
