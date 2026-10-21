@@ -19,6 +19,8 @@ import type { DocumentKnowledge, DocumentPersonal, DocumentRelations, DocumentSh
 import { createTask } from "./task";
 import { notifyTaskAssigned } from "./notify";
 import { selectDocumentAnswerSources, verifyDocumentAnswer } from "./document-answers";
+import { projectAttachments } from "@/db/course-extensions-schema";
+import { documentCommentMentions, type DocumentCollaboration } from "@/contracts/document-collaboration";
 
 type Row = typeof documents.$inferSelect;
 type Context = { tx: DbTx; actorId: string; actorName: string; projectId: string; teamId: string; role: string; archived: boolean; canManageGuide: boolean };
@@ -26,6 +28,75 @@ type Access = { row: Row; ownerName: string; permission: DocumentPermission; can
 const uuid = z.uuid();
 const permission = z.enum(["read", "comment", "edit"]);
 const writeInput = z.object({ requestId: uuid, expectedRevision: z.number().int().positive() });
+
+function collaborationIds(content: DocumentNode) {
+  const members = new Set<string>(), taskIds = new Set<string>(), attachments = new Set<string>();
+  function visit(node: DocumentNode) {
+    if (node.type === "documentMention") members.add(String(node.attrs?.userId));
+    if (node.type === "documentTaskReference") taskIds.add(String(node.attrs?.taskId));
+    if (node.type === "documentAttachment") attachments.add(String(node.attrs?.attachmentId));
+    if (node.type === "image" && typeof node.attrs?.src === "string") {
+      const match = /^\/api\/attachments\/([a-f0-9-]{36})$/i.exec(node.attrs.src); if (match) attachments.add(match[1]);
+    }
+    node.content?.forEach(visit);
+  }
+  visit(content); return { members: [...members], tasks: [...taskIds], attachments: [...attachments] };
+}
+async function collaborationResources(context: Context, content: DocumentNode): Promise<DocumentCollaboration> {
+  void content;
+  const [members, taskRows] = await Promise.all([
+    context.tx.select({ id: users.id, name: users.name, role: teamMembers.role }).from(teamMembers).innerJoin(users, eq(users.id, teamMembers.userId)).where(eq(teamMembers.teamId, context.teamId)),
+    context.tx.select({ id: tasks.id, title: tasks.title, status: tasks.status, dueDate: tasks.dueDate, assigneeName: users.name }).from(tasks).leftJoin(users, eq(users.id, tasks.assigneeId)).where(eq(tasks.projectId, context.projectId)),
+  ]);
+  return { members: members.map(m => ({ ...m, permission: "" })), tasks: taskRows, attachments: [] };
+}
+async function validateCollaborationReferences(context: Context, documentId: string, content: DocumentNode, fresh = false) {
+  const [previous] = await context.tx.select().from(documents).where(eq(documents.id, documentId));
+  const next = collaborationIds(content), old = previous && !fresh ? collaborationIds(previous.content) : { members: [], tasks: [], attachments: [] };
+  if (next.members.length + next.tasks.length + next.attachments.length > 200) throw new ValidationError("每篇文档最多引用 200 个成员、任务或附件");
+  const introducedMembers = next.members.filter(id => !old.members.includes(id));
+  if (introducedMembers.length && previous) {
+    const allowed = await readableDocumentMembers(context, previous);
+    if (introducedMembers.some(id => !allowed.some(m => m.id === id))) throw new ForbiddenError("只能提及已有文档访问权限的成员");
+  }
+  const introducedTasks = next.tasks.filter(id => !old.tasks.includes(id));
+  if (introducedTasks.length) {
+    const allowed = await context.tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, context.projectId), inArray(tasks.id, introducedTasks)));
+    if (introducedTasks.some(id => !allowed.some(t => t.id === id))) throw new ForbiddenError("只能引用本项目任务");
+  }
+  const introducedFiles = next.attachments.filter(id => !old.attachments.includes(id));
+  if (introducedFiles.length) {
+    const allowed = await context.tx.select({ id: projectAttachments.id }).from(projectAttachments).where(and(eq(projectAttachments.projectId, context.projectId), eq(projectAttachments.targetType, "document"), eq(projectAttachments.targetId, documentId), inArray(projectAttachments.id, introducedFiles), isNull(projectAttachments.deletedAt)));
+    if (introducedFiles.some(id => !allowed.some(a => a.id === id))) throw new ForbiddenError("只能插入当前文档已上传的附件");
+  }
+}
+export async function getDocumentCollaboration(actorId: string, projectId: string, documentId: string): Promise<DocumentCollaboration> {
+  return projectContext(actorId, projectId, async context => {
+    const item = await access(context, documentId);
+    const resources = await collaborationResources(context, item.row.content);
+    const allowed = await readableDocumentMembers(context, item.row);
+    const attachments = await context.tx.select({ id: projectAttachments.id, filename: projectAttachments.filename, mediaType: projectAttachments.mediaType, size: projectAttachments.size }).from(projectAttachments).where(and(eq(projectAttachments.projectId, projectId), eq(projectAttachments.targetType, "document"), eq(projectAttachments.targetId, documentId), isNull(projectAttachments.deletedAt)));
+    return { ...resources, members: allowed.map(m => ({ id: m.id, name: m.name, role: m.role, permission: actorPermission(item.row, m.id, m.role, m.grant ?? undefined)! })), attachments };
+  });
+}
+export async function notifyDocumentMentions(actorId: string, projectId: string, documentId: string, input: unknown) {
+  const data = writeInput.extend({ epoch: z.number().int().positive(), blockId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), userIds: z.array(uuid).min(1).max(30) }).parse(input);
+  return projectContext(actorId, projectId, async context => {
+    const item = await access(context, documentId, true); edit(context, item); revision(item, data.expectedRevision);
+    if (item.row.epoch !== data.epoch) throw new ConflictError("文档已恢复，请重新打开");
+    return once(context, data.requestId, `document.mention.${documentId}`, data, async () => {
+      let target: DocumentNode | undefined;
+      function visit(node: DocumentNode) { if (node.attrs?.id === data.blockId) target = node; node.content?.forEach(visit); }
+      visit(item.row.content);
+      if (!target || data.userIds.some(id => !collaborationIds(target!).members.includes(id))) throw new ConflictError("提及已移动或删除，请重新选择正文中的成员");
+      const allowed = await readableDocumentMembers(context, item.row);
+      if (data.userIds.some(id => !allowed.some(m => m.id === id))) throw new ForbiddenError("被提醒成员没有文档访问权限");
+      const recipients = [...new Set(data.userIds)];
+      await documentNotification(context, item.row, "document.mention", `document.mention:${documentId}:${data.epoch}:${data.expectedRevision}:${data.blockId}`, recipients, { blockId: data.blockId });
+      return { notified: recipients.filter(id => id !== actorId).length };
+    });
+  });
+}
 
 async function projectContext<T>(actorId: string, projectId: string, run: (context: Context) => Promise<T>): Promise<T> {
   uuid.parse(actorId); uuid.parse(projectId);
@@ -76,7 +147,7 @@ async function saveVersion(context: Context, row: Row, label: string, kind: Docu
   return versionDTO(saved);
 }
 function withBlockIds(node: DocumentNode): DocumentNode {
-  const block = ["paragraph", "heading", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary"].includes(node.type);
+  const block = ["paragraph", "heading", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary", "documentAttachment"].includes(node.type);
   return { ...node, ...(block ? { attrs: { ...node.attrs, id: node.attrs?.id ?? randomUUID() } } : {}), ...(node.content ? { content: node.content.map(withBlockIds) } : {}) };
 }
 
@@ -88,12 +159,12 @@ async function readableDocumentMembers(context: Context, row: Row) {
     .where(eq(teamMembers.teamId, context.teamId)).for("share", { of: [teamMembers] });
   return members.filter(member => actorPermission(row, member.id, member.role, member.grant ?? undefined));
 }
-async function documentNotification(context: Context, row: Row, type: string, eventKey: string, recipients: string[], extra: { commentId?: string } = {}) {
+async function documentNotification(context: Context, row: Row, type: string, eventKey: string, recipients: string[], extra: { commentId?: string; blockId?: string } = {}) {
   const allowed = await readableDocumentMembers(context, row);
   const selected = allowed.filter(member => member.id !== context.actorId && recipients.includes(member.id));
   if (!selected.length) return;
-  const titles: Record<string, string> = { "document.comment": "文档收到评论", "document.reply": "文档评论收到回复", "document.confirmation_requested": "文档待你确认", "document.confirmation_stale": "文档更新，需重新确认", "document.confirmed": "文档已确认" };
-  const href = `/projects/${row.projectId}/documents/${row.id}${extra.commentId ? `#comment-${extra.commentId}` : "#document-confirmation"}`;
+  const titles: Record<string, string> = { "document.mention": "有人在文档中提及了你", "document.comment_mention": "有人在文档评论中提及了你", "document.comment": "文档收到评论", "document.reply": "文档评论收到回复", "document.confirmation_requested": "文档待你确认", "document.confirmation_stale": "文档更新，需重新确认", "document.confirmed": "文档已确认" };
+  const href = `/projects/${row.projectId}/documents/${row.id}${extra.commentId ? `#comment-${extra.commentId}` : extra.blockId ? `#block=${encodeURIComponent(extra.blockId)}` : "#document-confirmation"}`;
   // In-app only: private document excerpts must never enter external channels.
   await context.tx.insert(notifications).values(selected.map(member => ({ eventKey, recipientId: member.id, projectId: row.projectId,
     type, title: titles[type], summary: `${context.actorName} · ${row.title}`, sourceType: "activity", sourceId: extra.commentId ?? row.id, href,
@@ -163,7 +234,7 @@ export async function createDocument(actorId: string, projectId: string, input: 
     active(context);
     return once(context, data.requestId, "document.create", data, async () => {
       const [row] = await context.tx.insert(documents).values({ projectId, ownerId: actorId, title: data.title, folder: data.folder, visibility: data.visibility, content, state: contentToYState(content), searchText: documentText(content), lastEditedById: actorId }).returning();
-      await indexReferences(context, row.id, content);
+      await indexReferences(context, row.id, content, false, true);
       return summary(context, { row, permission: "edit", canManage: true, ownerName: context.actorName });
     });
   });
@@ -196,7 +267,7 @@ export async function getDocumentDetail(actorId: string, projectId: string, docu
     const parentNames = new Map(parents.map(p => [p.id, p.name]));
     const canCreateTask = !context.archived && !item.row.deletedAt && ["admin", "student"].includes(context.role);
     const [bookmark] = await context.tx.select().from(documentBookmarks).where(and(eq(documentBookmarks.userId, actorId), eq(documentBookmarks.documentId, documentId)));
-    return { ...summary(context, item), bookmarked: !!bookmark, content: item.row.content, state: item.row.state, grants: item.canManage ? grantRows : [], members: item.canManage || canCreateTask ? members : [], canCreateTask, tasks: projectTasks, links: linkRows.map(link => ({ ...link, href: `/projects/${projectId}?task=${link.taskId}` })), comments: commentRows.reverse().map(row => ({ id: row.id, replyToId: row.replyToId, replyToAuthorName: row.replyToId ? parentNames.get(row.replyToId) ?? null : null, blockId: row.blockId, quote: row.quote, body: row.body, authorId: row.authorId ?? "", authorName: row.authorName, createdAt: row.createdAt.toISOString(), resolvedAt: row.resolvedAt?.toISOString() ?? null, canDelete: !context.archived && !item.row.deletedAt && (row.authorId === actorId || item.canManage) })), versions: versionRows.map(versionDTO), actorId, actorName: context.actorName };
+    return { ...summary(context, item), bookmarked: !!bookmark, content: item.row.content, state: item.row.state, grants: item.canManage ? grantRows : [], members: item.canManage || canCreateTask ? members : [], canCreateTask, tasks: projectTasks, links: linkRows.map(link => ({ ...link, href: `/projects/${projectId}?task=${link.taskId}` })), comments: commentRows.reverse().map(row => ({ id: row.id, replyToId: row.replyToId, replyToAuthorName: row.replyToId ? parentNames.get(row.replyToId) ?? null : null, blockId: row.blockId, quote: row.quote, body: row.body, authorId: row.authorId ?? "", authorName: row.authorName, createdAt: row.createdAt.toISOString(), resolvedAt: row.resolvedAt?.toISOString() ?? null, canEdit: !context.archived && !item.row.deletedAt && item.permission !== "read" && row.authorId === actorId, canDelete: !context.archived && !item.row.deletedAt && (row.authorId === actorId || item.canManage) })), versions: versionRows.map(versionDTO), actorId, actorName: context.actorName };
   });
 }
 export async function updateDocument(actorId: string, projectId: string, documentId: string, input: unknown) {
@@ -339,28 +410,43 @@ export async function restoreDocumentVersion(actorId: string, projectId: string,
   });
 }
 export async function addDocumentComment(actorId: string, projectId: string, documentId: string, input: unknown) {
-  const data = z.object({ requestId: uuid, replyToId: uuid.optional(), blockId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).nullable().optional(), quote: z.string().max(500).default(""), body: z.string().trim().min(1).max(3000) }).parse(input);
+  const data = z.object({ requestId: uuid, mentionIds: z.array(uuid).max(30).default([]), replyToId: uuid.optional(), blockId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).nullable().optional(), quote: z.string().max(500).default(""), body: z.string().trim().min(1).max(3000) }).parse(input);
   return projectContext(actorId, projectId, async context => {
     const item = await access(context, documentId, true); comment(context, item);
     return once(context, data.requestId, `document.comment.${documentId}`, data, async () => {
       const [parent] = data.replyToId ? await context.tx.select().from(comments).where(and(eq(comments.id, data.replyToId), eq(comments.documentId, documentId), isNull(comments.deletedAt))) : [];
       if (data.replyToId && !parent) throw new ForbiddenError("原评论已删除或不属于此文档");
       if (!parent && data.blockId && !documentBlockExists(item.row.content, data.blockId)) throw new ConflictError("该段落已改变或删除，请重新选择段落");
+      const mentioned = [...new Set(documentCommentMentions(data.body).map(m => m.id))];
+      const permitted = await readableDocumentMembers(context, item.row);
+      if (mentioned.some(id => !permitted.some(member => member.id === id))) throw new ForbiddenError("只能提及已有文档访问权限的成员");
       const [row] = await context.tx.insert(comments).values({ documentId, replyToId: parent?.id, blockId: parent ? parent.blockId : data.blockId, quote: parent ? parent.quote : data.quote, body: data.body, authorId: actorId, authorName: context.actorName }).returning({ id: comments.id });
       const participants = await context.tx.select({ id: comments.authorId }).from(comments).where(and(eq(comments.documentId, documentId), isNull(comments.deletedAt)));
       await documentNotification(context, item.row, parent ? "document.reply" : "document.comment", `document.comment:${row.id}`,
-        [...new Set([item.row.ownerId, ...participants.flatMap(person => person.id ? [person.id] : [])])], { commentId: row.id });
+        [...new Set([item.row.ownerId, ...participants.flatMap(person => person.id ? [person.id] : [])])].filter(id => !mentioned.includes(id)), { commentId: row.id });
+      await documentNotification(context, item.row, "document.comment_mention", `document.comment:${row.id}`, mentioned, { commentId: row.id });
       return row;
     });
   });
 }
 export async function changeDocumentComment(actorId: string, projectId: string, documentId: string, input: unknown, remove = false) {
-  const data = z.object({ requestId: uuid, commentId: uuid, resolved: z.boolean().optional() }).parse(input);
+  const data = z.object({ requestId: uuid, commentId: uuid, body: z.string().trim().min(1).max(3000).optional(), expectedBody: z.string().max(3000).optional(), resolved: z.boolean().optional() }).parse(input);
   return projectContext(actorId, projectId, async context => {
     const item = await access(context, documentId, true); comment(context, item);
     return once(context, data.requestId, `document.comment-${remove ? "delete" : "resolve"}.${documentId}`, data, async () => {
       const [row] = await context.tx.select().from(comments).where(and(eq(comments.id, data.commentId), eq(comments.documentId, documentId), isNull(comments.deletedAt)));
       if (!row || (row.authorId !== actorId && !(remove ? item.canManage : item.permission === "edit"))) throw new ForbiddenError();
+      if (!remove && data.body !== undefined) {
+        if (row.authorId !== actorId) throw new ForbiddenError("只能编辑自己的评论");
+        if (data.expectedBody !== row.body) throw new ConflictError("评论已被修改，请刷新后重试");
+        const mentioned = documentCommentMentions(data.body).map(m => m.id);
+        const allowed = await readableDocumentMembers(context, item.row);
+        if (mentioned.some(id => !allowed.some(m => m.id === id))) throw new ForbiddenError("只能提及已有文档访问权限的成员");
+        await context.tx.update(comments).set({ body: data.body }).where(eq(comments.id, row.id));
+        const oldMentions = documentCommentMentions(row.body).map(m => m.id);
+        await documentNotification(context, item.row, "document.comment_mention", `document.comment-edit:${data.requestId}`, mentioned.filter(id => !oldMentions.includes(id)), { commentId: row.id });
+        return { id: row.id };
+      }
       if (!remove && data.resolved === undefined) throw new ValidationError("请选择解决或重新打开评论");
       await context.tx.update(comments).set(remove ? { deletedAt: new Date() } : { resolvedAt: data.resolved ? new Date() : null, resolvedById: data.resolved ? actorId : null }).where(eq(comments.id, row.id));
       return { id: row.id };
@@ -442,7 +528,8 @@ function referenceIds(content: DocumentNode): string[] {
   function visit(node: DocumentNode) { if (node.type === "documentReference") ids.add(String(node.attrs?.documentId)); node.content?.forEach(visit); }
   visit(content); return [...ids];
 }
-async function indexReferences(context: Context, sourceId: string, content: DocumentNode, restoring = false) {
+async function indexReferences(context: Context, sourceId: string, content: DocumentNode, restoring = false, fresh = false) {
+  if (!restoring) await validateCollaborationReferences(context, sourceId, content, fresh);
   const ids = referenceIds(content);
   if (ids.length > 100) throw new ValidationError("每篇文档最多引用 100 篇文档");
   const old = await context.tx.select().from(documentReferences).where(eq(documentReferences.sourceId, sourceId));
@@ -459,7 +546,11 @@ function visibleDocument(actorId: string) { return or(eq(documents.visibility, "
 async function authorizedMarkdown(context: Context, content: DocumentNode) {
   const ids = referenceIds(content);
   const targets = ids.length ? await context.tx.select({ id: documents.id, title: documents.title }).from(documents).leftJoin(grants, and(eq(grants.documentId, documents.id), eq(grants.userId, context.actorId))).where(and(eq(documents.projectId, context.projectId), inArray(documents.id, ids), isNull(documents.deletedAt), visibleDocument(context.actorId))) : [];
-  return documentMarkdown(content, id => {
+  const resources = await collaborationResources(context, content);
+  return documentMarkdown(content, (id, kind) => {
+    if (kind === "member") { const member = resources.members.find(m => m.id === id); return member ? `@${member.name.replace(/[\[\]<>]/g, "")}` : "[@成员已离开]"; }
+    if (kind === "task") { const task = resources.tasks.find(t => t.id === id); return task ? `[${task.title.replace(/[\[\]<>]/g, "")} ](/projects/${context.projectId}?task=${id})` : "[项目任务不可用]"; }
+    if (kind === "attachment") return "[文档附件](/api/attachments/" + id + ")";
     const target = targets.find(t => t.id === id);
     return target ? `[${target.title.replace(/([\\\[\]`*_<>])/g, "\\$1")}](/projects/${context.projectId}/documents/${id})` : "[引用文档不可用]";
   });

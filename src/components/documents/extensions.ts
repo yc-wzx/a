@@ -11,7 +11,7 @@ import { knowledgeDocumentNodes } from "@/lib/document-nodes";
 export const BlockAnchor = Extension.create({
   name: "blockAnchor",
   addGlobalAttributes() {
-    return [{ types: ["paragraph", "heading", "blockquote", "codeBlock", "table", "bulletList", "orderedList", "taskList", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary"],
+    return [{ types: ["paragraph", "heading", "blockquote", "codeBlock", "table", "bulletList", "orderedList", "taskList", "image", "horizontalRule", "documentCallout", "documentToggle", "toggleSummary", "documentAttachment"],
       attributes: { id: { default: null, parseHTML: (element) => element.getAttribute("data-block-id"),
         renderHTML: (attributes) => attributes.id ? { "data-block-id": attributes.id } : {} } } }];
   },

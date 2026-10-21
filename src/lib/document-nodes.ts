@@ -29,4 +29,25 @@ export const DocumentReference = Node.create({
   renderHTML({ HTMLAttributes }) { return ["span", { "data-document-reference": HTMLAttributes.documentId, class: "document-reference" }, "引用文档"]; },
   renderText() { return "[引用文档]"; },
 });
-export function knowledgeDocumentNodes() { return [DocumentCallout, DocumentToggle, ToggleSummary, ToggleContent, DocumentReference]; }
+export const DocumentMention = Node.create({
+  name: "documentMention", group: "inline", inline: true, atom: true,
+  addAttributes() { return { userId: { default: null, parseHTML: el => el.getAttribute("data-document-mention") } }; },
+  parseHTML() { return [{ tag: "span[data-document-mention]" }]; },
+  renderHTML({ node }) { return ["span", { "data-document-mention": node.attrs.userId, class: "document-reference" }, "@成员"]; },
+  renderText() { return "[@成员]"; },
+});
+export const DocumentTaskReference = Node.create({
+  name: "documentTaskReference", group: "inline", inline: true, atom: true,
+  addAttributes() { return { taskId: { default: null, parseHTML: el => el.getAttribute("data-document-task") } }; },
+  parseHTML() { return [{ tag: "span[data-document-task]" }]; },
+  renderHTML({ node }) { return ["span", { "data-document-task": node.attrs.taskId, class: "document-reference document-task-reference" }, "项目任务"]; },
+  renderText() { return "[项目任务]"; },
+});
+export const DocumentAttachment = Node.create({
+  name: "documentAttachment", group: "block", atom: true,
+  addAttributes() { return { attachmentId: { default: null, parseHTML: el => el.getAttribute("data-document-attachment") } }; },
+  parseHTML() { return [{ tag: "div[data-document-attachment]" }]; },
+  renderHTML({ node }) { return ["div", { "data-document-attachment": node.attrs.attachmentId, class: "document-attachment-card" }, "文档附件"]; },
+  renderText() { return "[文档附件]"; },
+});
+export function knowledgeDocumentNodes() { return [DocumentCallout, DocumentToggle, ToggleSummary, ToggleContent, DocumentReference, DocumentMention, DocumentTaskReference, DocumentAttachment]; }

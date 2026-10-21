@@ -17,3 +17,14 @@ export function moveDocumentBlock(state: EditorState, direction: -1 | 1): Transa
   const movedStart = direction < 0 ? from : from + other.nodeSize;
   return tr.setSelection(TextSelection.near(tr.doc.resolve(movedStart + relative))).scrollIntoView();
 }
+
+/** Resolve identities at drop time so a remote insertion cannot shift the target. */
+export function dropDocumentBlock(state: EditorState, sourceId: string, targetId: string, after: boolean): Transaction | null {
+  if (sourceId === targetId) return null;
+  let source = -1, target = -1, sourceSize = 0;
+  state.doc.forEach((node, pos) => { if (node.attrs.id === sourceId) { source = pos; sourceSize = node.nodeSize; } if (node.attrs.id === targetId) target = pos + (after ? node.nodeSize : 0); });
+  if (source < 0 || target < 0 || source === target || source + sourceSize === target) return null;
+  const node = state.doc.nodeAt(source); if (!node) return null;
+  const tr = state.tr.delete(source, source + sourceSize); const insertion = target > source ? target - sourceSize : target;
+  return tr.insert(insertion, node).setSelection(TextSelection.near(tr.doc.resolve(insertion + 1))).scrollIntoView();
+}

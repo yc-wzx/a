@@ -1,4 +1,8 @@
-import { DocumentReference, DocumentToggle } from "@/lib/document-nodes";
+import { DocumentReference, DocumentToggle, DocumentMention, DocumentTaskReference, DocumentAttachment } from "@/lib/document-nodes";
+
+export const InteractiveDocumentMention = DocumentMention.extend({ addNodeView() { return ({ node }) => { const dom = document.createElement("span"); dom.dataset.documentMention = node.attrs.userId; dom.className = "document-reference"; dom.contentEditable = "false"; return { dom, ignoreMutation: () => true }; }; } });
+export const InteractiveDocumentTask = DocumentTaskReference.extend({ addNodeView() { return ({ node }) => { const dom = document.createElement("span"); dom.dataset.documentTask = node.attrs.taskId; dom.className = "document-reference document-task-reference"; dom.contentEditable = "false"; return { dom, ignoreMutation: () => true }; }; } });
+export const InteractiveDocumentAttachment = DocumentAttachment.extend({ addNodeView() { return ({ node }) => { const dom = document.createElement("div"); dom.dataset.documentAttachment = node.attrs.attachmentId; if (node.attrs.id) dom.dataset.blockId = node.attrs.id; dom.className = "document-attachment-card"; dom.contentEditable = "false"; return { dom, ignoreMutation: () => true }; }; } });
 
 export const InteractiveDocumentReference = DocumentReference.extend({
   addNodeView() {

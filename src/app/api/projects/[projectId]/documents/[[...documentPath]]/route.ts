@@ -4,7 +4,7 @@ import { ForbiddenError, ValidationError } from "@/lib/errors";
 import { addDocumentComment, changeDocumentComment, changeDocumentTaskLink, createDocument, createDocumentVersion, exportDocument, getDocumentDetail, getDocumentVersion, listDocuments, previewDocumentAi, restoreDocumentVersion, syncDocument, trashDocument, updateDocument } from "@/lib/documents";
 import { getDocumentKnowledge, setDocumentGuidePin, getDocumentRelations, getPersonalDocuments, setDocumentBookmark, recordDocumentVisit, createTaskFromDocument } from "@/lib/documents";
 import { askProjectDocuments } from "@/lib/documents";
-import { getDocumentConfirmation, requestDocumentConfirmation, confirmDocument } from "@/lib/documents";
+import { getDocumentCollaboration, notifyDocumentMentions, getDocumentConfirmation, requestDocumentConfirmation, confirmDocument } from "@/lib/documents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +47,7 @@ async function handle(request: NextRequest, context: Context) {
         return listDocuments(actor, projectId, { q: q.get("q") ?? "", folder: q.get("folder") ?? undefined, trash: q.get("trash") === "true", offset: Number(q.get("offset") ?? 0), taskId: q.get("taskId") ?? undefined });
       }
       if (!section) return getDocumentDetail(actor, projectId, documentId);
+      if (section === "collaboration" && !itemId) return getDocumentCollaboration(actor, projectId, documentId);
       if (section === "confirmation" && !itemId) return getDocumentConfirmation(actor, projectId, documentId);
       if (section === "references" && !itemId) return getDocumentRelations(actor, projectId, documentId);
       if (section === "versions") return itemId ? getDocumentVersion(actor, projectId, documentId, itemId) : (await getDocumentDetail(actor, projectId, documentId)).versions;
@@ -62,6 +63,7 @@ async function handle(request: NextRequest, context: Context) {
       if (method === "DELETE") return trashDocument(actor, projectId, documentId, input);
       if (method === "POST" && input && typeof input === "object" && "operation" in input && input.operation === "restore") return trashDocument(actor, projectId, documentId, input, true);
     }
+    if (section === "mentions" && !itemId && method === "POST") return notifyDocumentMentions(actor, projectId, documentId, input);
     if (section === "sync" && !itemId && method === "POST") return syncDocument(actor, projectId, documentId, input);
     if (section === "confirmation" && !itemId && method === "POST") return requestDocumentConfirmation(actor, projectId, documentId, input);
     if (section === "confirmation" && !itemId && method === "PATCH") return confirmDocument(actor, projectId, documentId, input);
