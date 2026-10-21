@@ -19,10 +19,12 @@ export function MilestoneSection({
   projectId,
   milestones,
   isAdmin,
+  compact = false,
 }: {
   projectId: string;
   milestones: Milestone[];
   isAdmin: boolean;
+  compact?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     createMilestoneAction,
@@ -54,7 +56,7 @@ export function MilestoneSection({
     });
   }
 
-  return (
+  const content = (
     <section className="space-y-2" data-tour="milestones">
       <h2 className="font-medium text-ink">里程碑</h2>
       <ul className="flex flex-wrap gap-2">
@@ -112,4 +114,5 @@ export function MilestoneSection({
       )}
     </section>
   );
+  return compact ? <details className="project-milestone-strip"><summary><span className="text-ink-faint">里程碑</span>{milestones.slice(0, 4).map(m => <span key={m.id} title={m.title}>{m.status === "done" ? "✓ " : ""}{m.title}</span>)}<span className="ml-auto text-primary">全部 {milestones.length} 个 ▾</span></summary><div className="project-milestone-expanded">{content}</div></details> : content;
 }

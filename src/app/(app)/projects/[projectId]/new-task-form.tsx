@@ -22,7 +22,7 @@ export function NewTaskForm({
   );
 
   return (
-    <details className="ac-card"><summary className="cursor-pointer px-4 py-3 text-sm font-medium text-primary">＋ 新建任务</summary><form ref={formRef} id="new-task" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); startTransition(() => formAction(form)); }} onChange={() => setRequestId(crypto.randomUUID())} className="ac-card scroll-mt-24 space-y-3 p-4"><fieldset disabled={pending} className="space-y-3">
+    <details className="project-new-task"><summary className="ac-btn cursor-pointer">＋ 新建任务</summary><form ref={formRef} id="new-task" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); startTransition(() => formAction(form)); }} onChange={() => setRequestId(crypto.randomUUID())} className="project-new-task-form scroll-mt-24 space-y-3 p-5"><fieldset disabled={pending} className="space-y-3">
       <h2 className="font-medium text-ink">新建任务</h2>
       <input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="requestId" value={requestId} /><input type="hidden" name="iterationRevision" value={iterations.find(i => i.id === iterationId)?.revision ?? ""} />
       <input name="title" aria-label="新任务标题" required maxLength={200} placeholder="任务标题" className="ac-field" />

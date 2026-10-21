@@ -99,7 +99,7 @@ export function TaskComments({
   }, [projectId, taskId, offset]);
   return (
     <section
-      className="space-y-3 border-t border-line pt-4 [overflow-wrap:anywhere]"
+      className="task-comments space-y-3 border-t border-line pt-4 [overflow-wrap:anywhere]"
       aria-label="团队评论"
     >
       <h3 className="font-semibold">团队评论</h3>
@@ -119,7 +119,7 @@ export function TaskComments({
         <article
           id={`comment-${item.id}`}
           key={item.id}
-          className="space-y-2 rounded border border-line p-3"
+          className="task-comment-entry space-y-2 rounded border border-line p-3"
         >
           <p className="text-xs text-ink-soft">
             {item.authorName} ·{" "}

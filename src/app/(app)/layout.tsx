@@ -5,6 +5,7 @@ import { NotificationNav } from "@/components/notification-nav";
 import { getMyProfile } from "@/lib/member-profile";
 import { MemberAvatar } from "@/components/people/member-avatar";
 import { TaskDrawerHost } from "@/components/tasks/task-drawer-host";
+import { WorkspaceFrame } from "@/components/workspace-frame";
 import { GlobalWorkspaceSearch } from "@/components/dashboard/global-workspace-search";
 import {
   GettingStartedHint,
@@ -22,7 +23,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-surface/85 px-4 py-3 backdrop-blur sm:px-6">
+      <header data-app-header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-surface/85 px-4 py-3 backdrop-blur sm:px-6">
         <div className="flex min-w-0 flex-wrap items-center gap-3 sm:gap-6">
           <Link href="/dashboard" className="flex shrink-0 items-center gap-2">
             <span
@@ -111,11 +112,11 @@ export default async function AppLayout({
           </div>
         </details>
       </header>
-      <div className="mx-auto max-w-6xl p-6">
+      <WorkspaceFrame>
         <GettingStartedHint userId={session.user.id} />
         {children}
         <TaskDrawerHost />
-      </div>
+      </WorkspaceFrame>
     </div>
   );
 }

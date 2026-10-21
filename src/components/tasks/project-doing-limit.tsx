@@ -27,7 +27,7 @@ export function ProjectDoingLimitControl({ data }: { data: ProjectDoingLimit }) 
         } catch { setError("保存状态暂时无法确认，请刷新后重试"); }
       });
     }}><label className="space-y-1 text-xs text-ink-soft">进行中主任务上限（留空关闭）<input type="number" min={1} max={99} step={1} value={value} disabled={pending} onChange={(event) => setValue(event.target.value)} className="ac-field w-48" /></label><button className="ac-btn-ghost text-sm" disabled={pending}>{pending ? "保存中…" : "保存"}</button></form>}
-    {(open || data.exceeded) && <p className="mt-1 text-xs text-ink-faint">按整个项目统计，不受当前筛选影响。只作提醒，仍可移动任务。</p>}
+    {open && <p className="mt-1 text-xs text-ink-faint">按整个项目统计，不受当前筛选影响。只作提醒，仍可移动任务。</p>}
     {error && <p role="alert" className="mt-1 text-xs text-high">{error}</p>}
   </div>;
 }

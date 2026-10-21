@@ -74,17 +74,14 @@ export default async function ProjectPage({
   // 用户还在看板上，不会因为一个失效的深链就丢掉整页上下文。
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 py-8">
-      <header>
+    <main className="project-task-page">
+      <header className="project-task-header">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="min-w-0 break-words font-display text-2xl font-semibold text-ink">
             {project.name}
           </h1>
           <ProjectNav projectId={projectId} current="tasks" />
         </div>
-        {project.description && (
-          <p className="mt-1 text-sm text-ink-soft">{project.description}</p>
-        )}
         <p className="mt-1 text-xs text-ink-faint">
           {project.startDate ?? "开始日期未设置"} ~{" "}
           {project.endDate ?? "结束日期未设置"} ·{" "}
@@ -95,6 +92,8 @@ export default async function ProjectPage({
             archived: "已归档",
           }[project.status] ?? project.status}
         </p>
+        <ProjectLeadership compact actorId={session.user.id} projectId={projectId} canManage={isAdmin && project.status !== "archived"} members={members} />
+        {project.description && <details className="project-description"><summary>项目说明</summary><p>{project.description}</p></details>}
       </header>
 
       {canWrite && (
@@ -109,41 +108,17 @@ export default async function ProjectPage({
         />
       )}
 
-      <ProjectLeadership
-        actorId={session.user.id}
-        projectId={projectId}
-        canManage={isAdmin && project.status !== "archived"}
-        members={members}
-      />
-
       <MilestoneSection
         projectId={projectId}
         milestones={projectMilestones}
         isAdmin={isAdmin && project.status !== "archived"}
+        compact
       />
 
       <section className="space-y-3" data-tour="board">
-        <div className="flex items-center justify-between"><h2 className="font-medium text-ink">项目任务</h2><Link className="ac-btn-ghost text-sm" href={`/projects/${projectId}/ai-drafts`}>打开我的项目助手</Link></div>
-        <p className="text-xs text-ink-soft">
-          在看板、列表或甘特图中点击任务打开详情，可查看、修改或删除。删除主任务会同时删除其子任务；老师角色只读。
-        </p>
-        <FilterBar
-          members={members.map((m) => ({ id: m.id, name: m.name }))}
-          milestones={projectMilestones.map((m) => ({
-            id: m.id,
-            name: m.title,
-          }))}
-          labels={teamLabels.map((l) => ({ id: l.id, name: l.name }))}
-          visible={visibleTasks.length}
-          total={projectTasks.length}
-        />
-        <ProjectDoingLimitControl data={doingLimit} />
-        <SavedProjectViews
-          key={`${session.user.id}:${projectId}`}
-          userId={session.user.id}
-          projectId={projectId}
-        />
         <TaskWorkspace
+          toolbar={<><FilterBar members={members.map(m => ({ id: m.id, name: m.name }))} milestones={projectMilestones.map(m => ({ id: m.id, name: m.title }))} labels={teamLabels.map(l => ({ id: l.id, name: l.name }))} visible={visibleTasks.length} total={projectTasks.length} /><SavedProjectViews compact key={`${session.user.id}:${projectId}`} userId={session.user.id} projectId={projectId} /></>}
+          notice={<ProjectDoingLimitControl data={doingLimit} />}
           projectId={projectId}
           today={today}
           groupBy={filters.group}
@@ -173,6 +148,7 @@ export default async function ProjectPage({
           allTasks={projectTasks.map((t) => ({ id: t.id, title: t.title }))}
           dependencies={dependencies}
         />
+        <details className="project-board-help"><summary>任务操作说明</summary><p>点击任务打开详情，可查看、修改或删除。删除主任务会同时删除其子任务；老师角色只读。可以拖动任务卡片右上角把手，或在“更多”菜单中移动任务；把手支持空格和左右方向键。</p><Link href={`/assistant?projectId=${projectId}`} className="text-primary">打开我的项目助手 →</Link></details>
       </section>
 
 

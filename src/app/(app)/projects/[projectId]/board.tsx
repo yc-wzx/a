@@ -72,7 +72,7 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-40 w-72 shrink-0 space-y-2 rounded-xl border border-line p-3 transition-colors ${
+      className={`min-h-40 min-w-0 space-y-3 rounded-xl p-3 transition-colors ${
         isOver ? "bg-primary-soft" : "bg-sunken"
       }`}
     >
@@ -166,8 +166,7 @@ export function Board({
       onDragEnd={handleDragEnd}
     >
       {error && <p className="text-sm text-high">{error}</p>}
-      {canWrite && <p className="mb-2 text-xs text-ink-soft">使用卡片右上角把手拖动，或通过“移动至”菜单调整分组。把手支持空格和左右方向键。</p>}
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div className="overflow-x-auto pb-2"><div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(250px, 1fr))` }}>
         {columns.map((col) => (
           <Column
             key={col.key}
@@ -180,7 +179,7 @@ export function Board({
             columns={columns} onMove={move} doingLimit={groupBy === "status" ? doingLimit : undefined}
           />
         ))}
-      </div>
+      </div></div>
     </DndContext>
   );
 }

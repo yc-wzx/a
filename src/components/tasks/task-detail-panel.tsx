@@ -161,6 +161,7 @@ export function TaskDetailPanel({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [tab, setTab] = useState<"content" | "outcome">("content");
+  const [editingFields, setEditingFields] = useState(false);
   const [split, setSplit] = useState(55);
   const splitRef = useRef<HTMLDivElement>(null);
   if (!dirtyFields && local && formVersion !== local.task.updatedAt) setFormVersion(local.task.updatedAt);
@@ -244,6 +245,7 @@ export function TaskDetailPanel({
       return;
     }
     dirty.current = false; setDirtyFields(false);
+    setEditingFields(false);
     setConflicted(false);
     setLocal((current) =>
       current ? { ...current, task: res.data.task } : current,
@@ -284,7 +286,7 @@ export function TaskDetailPanel({
   return (
     <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="任务详情">
       <button type="button" aria-label="点击遮罩关闭任务" tabIndex={-1} onClick={close} className="fixed inset-0 cursor-default bg-ink/40 backdrop-blur-sm" />
-      <div className="relative z-10 flex h-[min(880px,92vh)] w-[min(1200px,96vw)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-pop">
+      <div className="task-detail-window relative z-10 flex h-[min(880px,92vh)] w-[min(1200px,96vw)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-pop">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-6 py-4">
           <div className="min-w-0"><p className="text-xs text-ink-faint">任务协作</p><h3 className="truncate font-display text-lg font-semibold text-ink">{task?.title ?? "加载任务…"}</h3></div>
           <button ref={closeRef} type="button" onClick={close} aria-label="关闭" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-faint hover:bg-sunken">✕</button>
@@ -293,10 +295,10 @@ export function TaskDetailPanel({
         {!state.error && !state.data && <p className="p-6 text-sm text-ink-faint">载入任务详情…</p>}
         {task && local && <div ref={splitRef} className="flex min-h-0 flex-1">
           <main className="min-w-0 overflow-y-auto p-6" style={{ width: `${split}%` }}>
-            <nav className="mb-5 flex gap-2" aria-label="任务内容切换"><button className={tab === "content" ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab("content")}>任务内容</button><button className={tab === "outcome" ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab("outcome")}>提交成果</button></nav>
+            <nav className="mb-5 flex items-center gap-2" aria-label="任务内容切换"><button disabled={saving} className={tab === "content" ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab("content")}>任务内容</button><button disabled={saving} className={tab === "outcome" ? "ac-btn" : "ac-btn-ghost"} onClick={() => setTab("outcome")}>提交成果</button>{tab === "content" && canWrite && local.allowedActions.edit && <button type="button" disabled={saving} className="ac-btn-ghost ml-auto text-xs" onClick={() => { if (editingFields && dirtyFields && !window.confirm("放弃尚未保存的任务字段修改？")) return; if (editingFields) { dirty.current = false; setDirtyFields(false); setConflicted(false); setSaveError(null); } setEditingFields(!editingFields); }}>{editingFields ? "取消编辑" : "编辑任务"}</button>}</nav>
             <div hidden={tab !== "outcome"}><TaskOutcome key={taskId} projectId={projectId} taskId={taskId} title={task.title} canWrite={canWrite && local.allowedActions.edit} onDirtyChange={value => { childDrafts.current.outcome = value; }} onSaved={handleLabelDependencySaved} /></div>
             <div hidden={tab !== "content"} className="space-y-5">
-              {canWrite && local.allowedActions.edit ? <form key={`fields-${formVersion}`} onChange={() => { dirty.current = true; setDirtyFields(true); }} onSubmit={handleSave} className="space-y-4"><fieldset disabled={saving} className="space-y-4">
+              {canWrite && local.allowedActions.edit && editingFields ? <form key={`fields-${formVersion}`} onChange={() => { dirty.current = true; setDirtyFields(true); }} onSubmit={handleSave} className="space-y-4"><fieldset disabled={saving} className="space-y-4">
                 <Field label="标题"><input name="title" defaultValue={task.title} required maxLength={200} className="ac-field text-sm" /></Field>
                 <div className="grid grid-cols-2 gap-3"><Field label="状态"><select name="status" defaultValue={task.status} className="ac-field text-sm"><option value="todo">待办</option><option value="doing">进行中</option><option value="done">已完成</option></select></Field><Field label="截止日"><input type="date" name="dueDate" defaultValue={task.dueDate ?? ""} className="ac-field text-sm" /></Field></div>
                 <MemberPicker members={members} selected={task.assignees?.map(m => m.id) ?? (task.assigneeId ? [task.assigneeId] : [])} />
@@ -309,11 +311,11 @@ export function TaskDetailPanel({
                 {saveError && <p role="alert" className="text-sm text-high">{saveError}</p>}
                 {conflicted && <button type="button" className="ac-btn-ghost" onClick={() => { if (window.confirm("重新载入会放弃本次任务字段修改，确定继续？")) { dirty.current = false; setDirtyFields(false); setConflicted(false); refetch(); } }}>放弃字段修改，载入最新版本</button>}
                 <div className="flex justify-end"><button disabled={saving || conflicted} className="ac-btn">{saving ? "保存中…" : "保存任务"}</button></div>
-              </fieldset></form> : <div className="space-y-3 text-sm"><p>{STATUS_LABEL[task.status]} · 截止 {task.dueDate ?? "未设置"}</p><p>执行成员：{task.assignees?.map(m => m.name).join("、") || task.assigneeName || "未分配"}</p><p className="whitespace-pre-wrap text-ink-soft">{task.description || "暂无描述"}</p>{task.acceptanceCriteria && <p>验收标准：{task.acceptanceCriteria}</p>}{task.completionNote && <p>完成记录：{task.completionNote}</p>}</div>}
+              </fieldset></form> : <section className="task-read-summary"><dl className="task-read-meta"><div><dt>状态</dt><dd><span className={`ac-badge ${task.status === "done" ? "bg-done/10 text-done" : "bg-primary-soft text-primary"}`}>{STATUS_LABEL[task.status]}</span></dd></div><div><dt>执行成员</dt><dd>{task.assignees?.map(m => m.name).join("、") || task.assigneeName || "未分配"}</dd></div><div><dt>截止日期</dt><dd>{task.dueDate ?? "未设置"}</dd></div><div><dt>优先级</dt><dd>{{ low: "低", medium: "中", high: "高" }[task.priority]}</dd></div></dl><h4>任务描述</h4><p>{task.description || "暂无描述"}</p>{(task.acceptanceCriteria || task.completionNote) && <details className="mt-4 text-sm"><summary className="cursor-pointer text-ink-soft">验收标准与完成记录</summary>{task.acceptanceCriteria && <p className="mt-3 whitespace-pre-wrap">验收标准：{task.acceptanceCriteria}</p>}{task.completionNote && <p className="mt-3 whitespace-pre-wrap">完成记录：{task.completionNote}</p>}</details>}</section>}
               <TaskEnhancementSection key={`enhancements-${taskId}`} projectId={projectId} taskId={taskId} onSaved={onSaved} />
               <TaskDocumentLinks key={`docs-${taskId}`} projectId={projectId} taskId={taskId} />
               <TaskOrigin projectId={projectId} taskId={taskId} />
-              <ProjectAttachments projectId={projectId} targetType="task" targetId={taskId} canUpload={canWrite && local.allowedActions.edit} />
+              <details className="border-t border-line pt-3"><summary className="cursor-pointer text-sm text-ink-soft">附件与文件</summary><div className="pt-4"><ProjectAttachments projectId={projectId} targetType="task" targetId={taskId} canUpload={canWrite && local.allowedActions.edit} /></div></details>
               <p className="text-xs text-ink-faint">子任务 {local.subtaskProgress.doneCount}/{local.subtaskProgress.total} · 依赖 {local.dependencies.length} 条 · {task.iterationId ? "已加入迭代" : "未加入迭代"}</p>
               <details className="border-t border-line pt-3"><summary className="cursor-pointer text-sm text-ink-soft">标签、依赖与阻塞</summary><div className="mt-3 space-y-4">{local.labels.map(l => <span key={l.id} className="ac-badge mr-2">{l.name}</span>)}
                 {canWrite && local.allowedActions.edit && <><BlockControl projectId={projectId} taskId={task.id} task={task} onUpdated={next => setLocal(current => current ? { ...current, task: next } : current)} onReload={() => { refetch(); onSaved?.(); }} /><LabelDependencyForm key={`associations-${task.updatedAt}`} projectId={projectId} taskId={task.id} expectedUpdatedAt={task.updatedAt} currentLabelIds={local.labels.map(l => l.id)} currentSuccessorIds={local.dependencies.filter(d => d.predecessorId === task.id).map(d => d.successorId)} allLabels={allLabels} allTasks={allTasks} onSaved={handleLabelDependencySaved} /></>}
@@ -328,7 +330,7 @@ export function TaskDetailPanel({
             onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); }}
             onPointerMove={e => { if (!e.currentTarget.hasPointerCapture(e.pointerId) || !splitRef.current) return; const bounds = splitRef.current.getBoundingClientRect(); changeSplit((e.clientX - bounds.left) / bounds.width * 100); }}
             onPointerUp={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}><span className="h-12 w-1 rounded-full bg-line group-hover:bg-primary" /></div>
-          <aside className="min-w-0 flex-1 bg-sunken/20 p-5"><TaskCollaboration key={taskId} projectId={projectId} taskId={taskId} onDirtyChange={(key, value) => { childDrafts.current[key] = value; }} /></aside>
+          <aside className="task-collaboration-comments min-w-0 flex-1 bg-sunken/20 p-6"><TaskCollaboration key={taskId} projectId={projectId} taskId={taskId} onDirtyChange={(key, value) => { childDrafts.current[key] = value; }} /></aside>
         </div>}
       </div>
     </div>
