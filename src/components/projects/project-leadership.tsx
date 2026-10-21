@@ -9,11 +9,13 @@ export async function ProjectLeadership({
   projectId,
   canManage,
   members,
+  compact = false,
 }: {
   actorId: string;
   projectId: string;
   canManage: boolean;
   members: { id: string; name: string }[];
+  compact?: boolean;
 }) {
   let leadership;
   try {
@@ -30,7 +32,7 @@ export async function ProjectLeadership({
       </p>
     );
   }
-  return (
+  const content = (
     <section className="ac-card space-y-3 p-4" aria-label="项目负责人">
       <h2 className="break-words font-medium">
         项目负责人：{leadership.name ?? "未指定"}
@@ -66,4 +68,5 @@ export async function ProjectLeadership({
       )}
     </section>
   );
+  return compact ? <details className="project-tool-popover project-leader"><summary>负责人：{leadership.name ?? "未指定"} ▾</summary><div className="project-tool-popover-body">{content}</div></details> : content;
 }

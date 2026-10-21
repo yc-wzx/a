@@ -25,7 +25,7 @@ export function DocumentConfirmationPanel({ detail, handle, revision }: { detail
   }
   const round = state?.round;
   const confirmed = round?.participants.filter(member => member.confirmedAt).length ?? 0;
-  return <section id="document-confirmation" className="ac-card space-y-3 p-4" aria-label="文档确认">
+  return <details id="document-confirmation" className="document-confirmation-compact" aria-label="文档确认"><summary>文档确认：{error ? "读取失败" : !round ? "未发起" : round.stale ? "待重新确认" : `${confirmed}/${round.participants.length} 人已确认`} ▾</summary><section className="document-confirmation-content space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-semibold">文档确认 <span className={`ml-2 rounded px-2 py-1 text-xs ${round && !round.stale && confirmed === round.participants.length && confirmed > 0 ? "bg-green-50 text-green-800" : "bg-canvas text-ink-soft"}`}>{!round ? "未发起" : round.stale ? "正文已更新 · 待重新确认" : `${confirmed}/${round.participants.length} 人已确认`}</span></h2></div>
       <div className="flex gap-2">{state?.canConfirm && <button type="button" className="ac-btn" disabled={busy || !handle} onClick={() => void submit(true)}>我已核对，确认此版</button>}{state?.canRequest && <button type="button" className="ac-btn-ghost" disabled={busy} onClick={() => setChoosing(value => !value)}>{choosing ? "取消" : round ? "重新发起确认" : "请成员确认"}</button>}</div>
     </div>
@@ -33,5 +33,5 @@ export function DocumentConfirmationPanel({ detail, handle, revision }: { detail
     {!round && <p className="text-xs text-ink-soft">需求、设计或展示稿准备好后，请相关成员核对当前正文。确认只代表已核对，不替代成果验收。</p>}
     {choosing && <div className="space-y-3 border-t border-line pt-3"><p className="text-xs text-ink-soft">选择已有访问权限的成员。正文修改后本轮确认失效，并在站内提醒他们重新核对；调整标题或目录不会使正文确认失效。</p><div className="flex flex-wrap gap-3">{state?.candidates.map(member => <label key={member.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selected.includes(member.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, member.id] : ids.filter(id => id !== member.id))} />{member.name}</label>)}</div><button type="button" className="ac-btn" disabled={busy || !selected.length || !handle} onClick={() => void submit(false)}>发送确认请求</button></div>}
     {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
-  </section>;
+  </section></details>;
 }

@@ -36,6 +36,8 @@ export function TaskWorkspace(props: {
   dependencies: { predecessorId: string; successorId: string }[];
   today: string;
   doingLimit?: { doingLimit: number | null; doingCount: number; exceeded: boolean };
+  toolbar?: React.ReactNode;
+  notice?: React.ReactNode;
 }) {
   const { tasks, today, groupBy, members, milestones } = props;
   const router = useRouter(),
@@ -60,9 +62,9 @@ export function TaskWorkspace(props: {
   const columns = deriveColumns(groupBy, { members, milestones });
   return (
     <div className="space-y-3" aria-busy={pending}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="project-task-toolbar">
         <nav
-          className="inline-flex rounded-lg border border-line bg-surface p-1"
+          className="inline-flex shrink-0 gap-1 rounded-lg p-1"
           aria-label="任务视图"
         >
           {(Object.keys(VIEW_LABELS) as TaskView[]).map((key) => {
@@ -73,7 +75,7 @@ export function TaskWorkspace(props: {
                 key={key}
                 aria-pressed={view === key}
                 onClick={() => change("view", key === "board" ? null : key)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors ${view === key ? "bg-primary text-white" : "text-ink-soft hover:bg-sunken"}`}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors ${view === key ? "bg-primary-soft text-primary" : "text-ink-soft hover:bg-sunken"}`}
               >
                 <Icon size={15} aria-hidden />
                 {VIEW_LABELS[key]}
@@ -81,6 +83,7 @@ export function TaskWorkspace(props: {
             );
           })}
         </nav>
+        <div className="project-task-toolbar-actions">{props.toolbar}</div>
         {view === "list" && (
           <label className="flex items-center gap-2 text-xs text-ink-soft">
             排序
@@ -103,6 +106,7 @@ export function TaskWorkspace(props: {
           </label>
         )}
       </div>
+      {props.notice}
       {tasks.length === 0 && (
         <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-ink-soft">
           当前没有符合筛选的任务；可清空筛选，或创建任务。

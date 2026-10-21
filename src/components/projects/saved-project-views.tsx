@@ -14,9 +14,11 @@ import {
 export function SavedProjectViews({
   userId,
   projectId,
+  compact = false,
 }: {
   userId: string;
   projectId: string;
+  compact?: boolean;
 }) {
   const key = savedViewsStorageKey(userId, projectId);
   const [views, setViews] = useState<SavedProjectView[]>([]);
@@ -70,14 +72,14 @@ export function SavedProjectViews({
     return value;
   }
   return (
-    <details className="rounded-xl border border-line bg-surface p-3">
+    <details className={compact ? "project-tool-popover project-saved-views" : "rounded-xl border border-line bg-surface p-3"}>
       <summary className="cursor-pointer text-sm font-medium text-ink">
         常用筛选{" "}
         <span className="text-xs font-normal text-ink-faint">
-          {views.length ? `· ${views.length} 个` : "· 保存常用的筛选与视图"}
+          {views.length ? `· ${views.length} 个` : compact ? " ▾" : "· 保存常用的筛选与视图"}
         </span>
       </summary>
-      <div className="mt-3 space-y-3">
+      <div className={compact ? "project-tool-popover-body space-y-3" : "mt-3 space-y-3"}>
         <p className="text-xs text-ink-soft">
           保存在你的账号中，按项目分开；登录其他设备后也可使用。最多保存 12 个。
         </p>

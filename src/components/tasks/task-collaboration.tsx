@@ -58,7 +58,7 @@ export function TaskCollaboration({ projectId, taskId, onDirtyChange }: { projec
       <div className="py-3 text-xs text-ink-soft">仅 {data.participants.map(m => m.name).join("、")} 可见</div>
       <div ref={scroll} onScroll={e => { const el = e.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; if (atBottom.current) { setNewCount(0); lastCount.current = data.messages.length; } }} className="min-h-48 flex-1 space-y-3 overflow-y-auto rounded-xl bg-sunken/50 p-3" aria-live="polite">
         {data.hasMore && <button className="text-xs text-primary" onClick={async () => { const before = older[0]?.createdAt ?? data.messages[0]?.createdAt; const r = await readCollaborationAction(projectId, taskId, before); if (r.ok) setOlder(o => [...r.data.messages, ...o].filter((v, i, a) => a.findIndex(m => m.id === v.id) === i)); }}>加载更早消息</button>}
-        {[...older, ...data.messages].filter((v, i, a) => a.findIndex(m => m.id === v.id) === i).map(m => <article key={m.id} className="rounded-lg border border-line bg-surface p-3">
+        {[...older, ...data.messages].filter((v, i, a) => a.findIndex(m => m.id === v.id) === i).map(m => <article key={m.id} className="task-discussion-entry rounded-lg border border-line bg-surface p-3">
           <p className="text-xs text-ink-faint">{m.authorName} · {new Date(m.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</p>
           {m.replyToId && <p className="mt-1 border-l-2 border-line pl-2 text-xs text-ink-faint">回复：{[...older, ...data.messages].find(x => x.id === m.replyToId)?.body.slice(0, 80) ?? "较早的讨论消息"}</p>}
           <p id={`discussion-${m.id}`} className="my-2 whitespace-pre-wrap break-words text-sm">{m.body}</p>

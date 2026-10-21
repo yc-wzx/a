@@ -67,8 +67,9 @@ export function FilterBar({
     filters.overdue;
 
   return (
-    <div className="space-y-2 rounded-xl border border-line bg-sunken p-3 text-sm">
-      <div className="flex flex-wrap items-center gap-3">
+    <details className="project-tool-popover project-filter-menu">
+      <summary>筛选{dirty ? " · 已筛选" : ""} ▾ <span className="text-ink-faint">{visible}/{total}</span></summary>
+      <div className="project-tool-popover-body space-y-4 text-sm"><div className="flex flex-wrap items-center gap-3">
         <Group name="指派人">
           {[...members, { id: "none", name: "未指派" }].map((m) => (
             <Chip
@@ -166,7 +167,8 @@ export function FilterBar({
           </button>
         )}
       </div>
-    </div>
+      </div>
+    </details>
   );
 }
 

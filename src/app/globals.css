@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../components/workspace-polish.css";
 
 /* ============================================================
    AgileCampus 设计系统 · 「学术工作台」
@@ -40,8 +41,8 @@
   --color-low-soft: #ecedf0;
 
   /* 字体 */
-  --font-sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-display: var(--font-display), Georgia, "Songti SC", serif;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: var(--font-fraunces), Georgia, "Songti SC", serif;
 
   /* 形状 */
   --radius-card: 0.75rem;
