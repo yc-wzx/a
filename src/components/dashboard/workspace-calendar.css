@@ -7,3 +7,42 @@
 .wc-range-row{display:grid;grid-template-columns:48px minmax(0,1fr);border-bottom:1px solid #e4eaf0;background:#fff}.wc-range-row .wc-axis-label{padding:8px 2px}.wc-range-bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:5px 0;min-height:32px}.wc-range-bars>div{min-width:0;padding:0 3px}.wc-range-bars .wc-entry{padding:4px 8px;font-size:11px;white-space:nowrap;overflow:hidden}.wc-range-bars .wc-entry-title{overflow:hidden;text-overflow:ellipsis}
 
 .wc-month-week>.wc-range-bars:empty{display:none}
+
+/* One calendar, compact on the workspace and expanded without losing its state. */
+.wc-dashboard .wc-heading{padding:17px 18px 14px;border-bottom:0}
+.wc-dashboard .wc-heading h2{font-size:16px;color:var(--color-ink)}
+.wc-expand-button{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--color-primary);padding:5px 0}
+.wc-dashboard .wc-body{padding:0 18px}
+.wc-dashboard .wc-navigation h3{font-size:13px;white-space:nowrap}
+.wc-dashboard .wc-toolbar{gap:10px}
+.wc-dashboard .wc-tabs button{padding:5px 9px}
+.wc-dashboard .wc-source-row{margin:13px 0;gap:8px}
+.wc-dashboard .wc-source-options{gap:14px}
+.wc-dashboard .wc-source-options label{font-size:11px}
+.wc-dashboard.wc-inline .wc-layout{grid-template-columns:minmax(0,1fr);gap:0}
+.wc-dashboard.wc-inline .wc-week{min-width:0}
+.wc-dashboard.wc-inline .wc-week-head{height:59px}
+.wc-dashboard.wc-inline .wc-week-head button{padding:5px 2px;gap:2px}
+.wc-dashboard.wc-inline .wc-week-head b{font-size:16px;line-height:25px;width:25px}
+.wc-dashboard.wc-inline .wc-date-row{top:59px}
+.wc-dashboard.wc-inline .wc-week-scroll{max-height:470px;scroll-padding-top:100px}
+.wc-dashboard.wc-inline .wc-week-head,.wc-dashboard.wc-inline .wc-date-row,.wc-dashboard.wc-inline .wc-time-grid{grid-template-columns:40px repeat(7,minmax(0,1fr))}
+.wc-dashboard.wc-inline .wc-range-row{grid-template-columns:40px minmax(0,1fr)}
+.wc-dashboard.wc-inline .wc-position .wc-entry{padding:2px 4px;gap:0}
+.wc-dashboard.wc-inline .wc-sidebar{padding:0;border:0}
+.wc-dashboard.wc-inline .wc-mini{display:none}
+.wc-dashboard.wc-inline .wc-day-summary{border-top:1px solid var(--color-line);margin-top:0;padding:12px 0 0}
+.wc-dashboard.wc-inline .wc-day-summary h3{font-size:12px}
+.wc-dashboard.wc-inline .wc-day-summary > p{display:inline-block;margin-right:8px;font-size:11px}
+.wc-dashboard.wc-inline .wc-day-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+.wc-dashboard.wc-inline .wc-day-items:empty{display:none}
+.wc-dashboard.wc-inline .wc-management{flex-direction:row;flex-wrap:wrap;border:0;padding:12px 0 16px;gap:14px}
+.wc-dashboard.wc-inline .wc-footnote{padding:9px 0 12px;font-size:10px}
+.wc-dashboard.wc-inline .wc-month-cell{min-height:75px}
+.wc-dashboard.wc-inline .wc-agenda{max-height:470px;overflow:auto}
+.wc-expanded-dialog{margin:auto;padding:0;border:0;border-radius:16px;width:min(1320px,94vw);max-width:none;max-height:92dvh;background:var(--color-surface);color:var(--color-ink);box-shadow:0 24px 90px #14263c40;overflow:auto}
+.wc-expanded-dialog::backdrop{background:#14263c66;backdrop-filter:blur(3px)}
+.wc-expanded{border:0;border-radius:0}
+.wc-expanded .wc-heading{position:sticky;top:0;z-index:5;background:var(--color-surface);border-bottom:1px solid var(--color-line);margin-bottom:16px}
+.wc-expanded .wc-week-scroll{max-height:calc(90dvh - 245px)}
+.wc-expanded .wc-footnote{padding-bottom:18px}

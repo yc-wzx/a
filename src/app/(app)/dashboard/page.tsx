@@ -27,7 +27,7 @@ import {
   type RevisionRequiredItem,
 } from "@/lib/workspace-summary";
 import { getDashboardContext } from "@/lib/dashboard-context";
-import { DashboardTaskList } from "@/components/dashboard/task-list";
+import { RecentTasks } from "@/components/dashboard/recent-tasks";
 import {
   WorkspaceCommandMenu,
   RefreshWorkspace,
@@ -304,7 +304,7 @@ export default async function DashboardPage({
     });
   };
   return (
-    <main className="workspace">
+    <main className="workspace workspace-refined">
       <header className="workspace-header">
         <div className="min-w-0">
           <p className="mb-2 flex items-center gap-2 text-xs font-medium text-primary">
@@ -412,16 +412,21 @@ export default async function DashboardPage({
           <ArrowRight aria-hidden className="size-4" />
         </Link>
       </section>
-      <WorkspaceCalendarPanel today={today} taskCount={taskCount} taskVersion={JSON.stringify(allTasks ?? [])}>
-            <p className="px-5 pb-4 text-xs text-ink-soft">
-              按截止时间排列 · 包含指派给你的子任务
-            </p>
-            {summary.tasks.state === "unavailable" ? (
-              <UnavailableNote message={summary.tasks.message} />
-            ) : (
-              <DashboardTaskList groups={groups!} />
-            )}
-      </WorkspaceCalendarPanel>
+      <div className="workspace-primary">
+        <WorkspaceCalendarPanel standalone today={today} taskCount={taskCount} taskVersion={JSON.stringify(allTasks ?? [])} />
+        <aside className="workspace-primary-sidebar">
+          <RecentTasks groups={groups} error={summary.tasks.state === "unavailable" ? summary.tasks.message : undefined} />
+          <section className="workspace-panel workspace-feedback">
+            <SectionHeading title="教师反馈" count={revisions?.total} href="#revisions" />
+            {summary.revisionRequired.state === "unavailable" ? <UnavailableNote message={summary.revisionRequired.message} /> : focusRevision ? <div className="workspace-feedback-body">
+              <span className="workspace-feedback-badge">需要修改 · 第 {focusRevision.versionNumber} 版</span>
+              <h3>{focusRevision.title}</h3>
+              <p>{focusRevision.comment || "请查看评审记录，按教师意见修改后重新提交。"}</p>
+              <Link className="workspace-text-link" href={`/projects/${focusRevision.projectId}/deliverables/${focusRevision.id}?versionId=${focusRevision.versionId}&feedbackId=${focusRevision.feedbackId}`}>查看并处理<ArrowRight size={14} aria-hidden /></Link>
+            </div> : <p className="workspace-brief-empty">暂无待处理的教师反馈。</p>}
+          </section>
+        </aside>
+      </div>
       <div className="workspace-columns">
         <div className="min-w-0 space-y-5">
           <section className="workspace-panel" data-tour="workspace-projects">

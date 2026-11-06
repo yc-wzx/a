@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type DragEvent } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, ListTodo, LockKeyhole, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ListTodo, LockKeyhole, RefreshCw, Maximize2, X } from "lucide-react";
 import Link from "next/link";
 import { TaskLink } from "@/components/tasks/task-link";
 import type { CalendarEntry, CalendarSource, WorkspaceCalendar } from "@/contracts/workspace-calendar";
@@ -24,10 +24,40 @@ function EntryLink({ entry, day, today, compact = false }: { entry: CalendarEntr
   </TaskLink>{entry.move && entry.when === "time" && <button type="button" className="absolute right-0 top-0 rounded bg-surface/95 px-1 text-[10px] text-ink-soft hover:text-primary" aria-label={`调整「${entry.title}」时间；也可拖动至日历时段`} title="拖动调整时间，或点击输入新时间" draggable onClick={e => { e.preventDefault(); e.stopPropagation(); move(entry); }} onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("application/x-agilecampus-calendar", entry.id); e.dataTransfer.effectAllowed = "move"; }}>↕</button>}</div>;
 }
 
-export function WorkspaceCalendarPanel({ today, taskVersion, taskCount, children }: { today: string; taskVersion: string; taskCount: number | null; children: ReactNode }) {
+export function WorkspaceCalendarPanel({ today, taskVersion, taskCount, children, standalone = false }: { today: string; taskVersion: string; taskCount: number | null; children?: ReactNode; standalone?: boolean }) {
   const [tab, setTab] = useState<"calendar" | "tasks">("calendar"), [view, setView] = useState<CalendarView>("week"), [selected, setSelected] = useState(today), [anchor, setAnchor] = useState(today);
   const [enabled, setEnabled] = useState<CalendarSource[]>(["schedule", "work", "deadline"]), [reload, setReload] = useState(0);
   const weekScroll = useRef<HTMLDivElement>(null);
+  const expandedDialog = useRef<HTMLDialogElement>(null);
+  const expandButton = useRef<HTMLButtonElement>(null);
+  const savedScroll = useRef(0);
+  const panelRef = useRef<HTMLElement>(null);
+  const [inlineHeight, setInlineHeight] = useState(0);
+  const wasExpanded = useRef(false);
+  const [expanded, setExpanded] = useState(false);
+  const hourHeight = standalone && !expanded ? 28 : 52;
+  const hourHeightRef = useRef(hourHeight);
+  function resizeCalendar(next: boolean) {
+    if (next) setInlineHeight(panelRef.current?.offsetHeight ?? 0);
+    savedScroll.current = (weekScroll.current?.scrollTop ?? 0) / hourHeightRef.current;
+    setExpanded(next);
+  }
+  useEffect(() => {
+    hourHeightRef.current = hourHeight;
+    if (expanded) expandedDialog.current?.showModal();
+    if (!expanded && wasExpanded.current) expandButton.current?.focus();
+    wasExpanded.current = expanded;
+    if (weekScroll.current) weekScroll.current.scrollTop = savedScroll.current * hourHeight;
+    if (!expanded) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = overflow; };
+  }, [expanded, hourHeight]);
+  useEffect(() => {
+    const close = () => resizeCalendar(false);
+    window.addEventListener("agilecampus:before-task-change", close);
+    return () => window.removeEventListener("agilecampus:before-task-change", close);
+  }, []);
   const moveDialog = useRef<HTMLDialogElement>(null);
   const [result, setResult] = useState<{ key: string; data?: WorkspaceCalendar; error?: string }>({ key: "" });
   const [proposal, setProposal] = useState<{ entry: CalendarEntry; start: string; requestId: string } | null>(null), [movePreview, setMovePreview] = useState<{ startAt: string; endAt: string; conflicts: string[] } | null>(null), [moving, setMoving] = useState(false), [moveError, setMoveError] = useState("");
@@ -63,7 +93,6 @@ export function WorkspaceCalendarPanel({ today, taskVersion, taskCount, children
   const timed = days.flatMap(day => dayLayout(entries, day));
   const firstHour = Math.min(8, ...timed.map(e => Math.floor(e.start / 60))), lastHour = Math.max(22, ...timed.map(e => Math.ceil(e.end / 60)));
   const bars = rangeLayout(entries, range.startDate);
-  const hourHeight = 52;
   function propose(entry: CalendarEntry, instant?: string) {
     if (!entry.move || entry.when !== "time") return;
     setProposal({ entry, start: localInput(instant ?? entry.startAt), requestId: crypto.randomUUID() }); setMovePreview(null); setMoveError("");
@@ -87,13 +116,14 @@ export function WorkspaceCalendarPanel({ today, taskVersion, taskCount, children
     } catch (error) { setMoveError(error instanceof Error ? error.message : "调整失败，请重试"); } finally { setMoving(false); }
   }
   useEffect(() => {
-    if (view === "week" && data && weekScroll.current) weekScroll.current.scrollTop = Math.max(0, 8 - firstHour) * hourHeight;
+    if (view === "week" && data && weekScroll.current) weekScroll.current.scrollTop = Math.max(0, 8 - firstHour) * hourHeightRef.current;
   }, [view, data, firstHour]);
-  return <MoveContext.Provider value={entry => propose(entry)}><section id="tasks" className="workspace-panel wc-panel scroll-mt-24" data-tour="workspace-tasks">
-    <div className="wc-heading"><div><h2>我的工作</h2><span className="wc-subtitle">任务推进与个人时间安排</span></div><div className="wc-tabs" role="group" aria-label="我的工作视图">
+  const panel = <section ref={panelRef} id={standalone ? "workspace-calendar" : "tasks"} className={`workspace-panel wc-panel scroll-mt-24${standalone ? " wc-dashboard" : ""}${expanded ? " wc-expanded" : " wc-inline"}`} data-tour={standalone ? "workspace-calendar" : "workspace-tasks"}>
+
+    <div className="wc-heading"><div><h2 id="workspace-calendar-title">{standalone ? "我的日历" : "我的工作"}</h2>{!standalone && <span className="wc-subtitle">任务推进与个人时间安排</span>}</div>{standalone ? <button ref={expandButton} type="button" className="wc-expand-button" onClick={() => resizeCalendar(!expanded)}>{expanded ? <X size={15} aria-hidden /> : <Maximize2 size={15} aria-hidden />}{expanded ? "收起日历" : "放大日历"}</button> : <div className="wc-tabs" role="group" aria-label="我的工作视图">
       <button type="button" aria-pressed={tab === "tasks"} onClick={() => setTab("tasks")}><ListTodo size={15} aria-hidden />任务列表{taskCount != null && <span>{taskCount}</span>}</button>
       <button type="button" aria-pressed={tab === "calendar"} onClick={() => setTab("calendar")}><CalendarDays size={15} aria-hidden />日历</button>
-    </div></div>
+    </div>}</div>
     {tab === "tasks" ? children : <div className="wc-body">
       <div className="wc-toolbar">
         <div className="wc-navigation"><button type="button" onClick={() => move(-1)} aria-label="上一时段"><ChevronLeft size={17} /></button><button type="button" onClick={() => move(1)} aria-label="下一时段"><ChevronRight size={17} /></button><button type="button" onClick={() => { setAnchor(today); setSelected(today); }}>今天</button><h3>{view === "month" ? `${anchor.slice(0, 4)} 年 ${Number(anchor.slice(5, 7))} 月` : `${range.startDate.slice(5)} — ${range.endDate.slice(5)}`}</h3></div>
@@ -105,8 +135,8 @@ export function WorkspaceCalendarPanel({ today, taskVersion, taskCount, children
         <div className="wc-layout"><div className="wc-main">
           {view === "week" && <div className="wc-week-scroll" ref={weekScroll} tabIndex={0} role="region" aria-label="周日历，滚动查看全天安排"><div className="wc-week">
             <div className="wc-week-head"><span className="wc-axis-label">日期</span>{days.map((day, n) => <button key={day} type="button" aria-label={`选择 ${day}`} aria-pressed={selected === day} className={`${selected === day ? "wc-selected" : ""} ${day === today ? "wc-today" : ""}`} onClick={() => choose(day)}><span>周{weekdays[n]}</span><b>{Number(day.slice(8))}</b></button>)}</div>
-            <div className="wc-range-row" aria-label="本周迭代区间"><span className="wc-axis-label">迭代</span><div className="wc-range-bars">{bars.map(bar => <div key={bar.entry.id} style={{ gridColumn: `${bar.start + 1} / ${bar.end + 2}`, gridRow: bar.lane + 1 }}><EntryLink entry={bar.entry} day={range.startDate} today={today} compact /></div>)}</div></div>
-            <div className="wc-date-row"><span className="wc-axis-label">日期节点</span>{days.map(day => <div key={day} className={day === selected ? "wc-day-selected" : ""}>{entriesOnDay(entries, day).filter(e => e.when === "date").map(e => <EntryLink key={e.id} entry={e} day={day} today={today} compact />)}</div>)}</div>
+            {bars.length > 0 && <div className="wc-range-row" aria-label="本周迭代区间"><span className="wc-axis-label">迭代</span><div className="wc-range-bars">{bars.map(bar => <div key={bar.entry.id} style={{ gridColumn: `${bar.start + 1} / ${bar.end + 2}`, gridRow: bar.lane + 1 }}><EntryLink entry={bar.entry} day={range.startDate} today={today} compact /></div>)}</div></div>}
+            {entries.some(e => e.when === "date") && <div className="wc-date-row"><span className="wc-axis-label">日期节点</span>{days.map(day => <div key={day} className={day === selected ? "wc-day-selected" : ""}>{entriesOnDay(entries, day).filter(e => e.when === "date").map(e => <EntryLink key={e.id} entry={e} day={day} today={today} compact />)}</div>)}</div>}
             <div className="wc-time-grid" style={{ height: (lastHour - firstHour) * hourHeight }}><div className="wc-axis">{Array.from({ length: lastHour - firstHour }, (_, n) => <span key={n} style={{ top: n * hourHeight }}>{String(n + firstHour).padStart(2, "0")}:00</span>)}</div>{days.map(day => <div key={day} className={`wc-time-day ${day === selected ? "wc-day-selected" : ""}`} style={{ backgroundSize: `100% ${hourHeight}px` }} onDragOver={e => { if (e.dataTransfer.types.includes("application/x-agilecampus-calendar")) e.preventDefault(); }} onDrop={e => drop(e, day, Math.max(0,Math.min(1425, Math.round((firstHour * 60 + (e.clientY - e.currentTarget.getBoundingClientRect().top) / hourHeight * 60) / 15) * 15)))}>
               {dayLayout(entries, day).map(item => <div key={item.entry.id} className="wc-position" style={{ top: (item.start / 60 - firstHour) * hourHeight, height: Math.max(18, (item.end - item.start) / 60 * hourHeight), left: `${item.lane / item.lanes * 100}%`, width: `${100 / item.lanes}%` }}><EntryLink entry={item.entry} day={day} today={today} compact={item.end - item.start < 40} /></div>)}
             </div>)}</div>
@@ -119,17 +149,21 @@ export function WorkspaceCalendarPanel({ today, taskVersion, taskCount, children
             const list = entriesOnDay(entries, day);
             return list.length ? <section key={day}><button type="button" className={`wc-agenda-date ${day === selected ? "wc-selected" : ""}`} onClick={() => choose(day)}>{dayTitle(day)}{day === today && <span>今天</span>}</button><div>{list.map(e => <EntryLink key={e.id} entry={e} day={day} today={today} />)}</div></section> : null;
           })}{!entries.length && <p className="wc-state">当前范围暂无已登记安排。未登记不代表空闲。</p>}</div>}
-          <p className="wc-footnote">截止节点不占工作时段。拖动 ↕ 调整本人手动日程或工作安排，也可点击 ↕ 输入时间；确认前检查冲突，任务截止日期保持原值。</p>
+          <p className="wc-footnote">{standalone && !expanded ? "点击日期查看当天安排；放大后可查看详情、调整工作时间。" : "截止节点不占工作时段。拖动 ↕ 或点击输入新时间，检查冲突后确认；任务截止日期保持原值。"}</p>
           {enabled.length === 0 && <p className="wc-warning">尚未选择显示内容，请勾选上方分类。</p>}
         </div><aside className="wc-sidebar">
           <div className="wc-mini"><div className="wc-mini-title">{Number(anchor.slice(5, 7))} 月 · 快速选日</div><div className="wc-mini-grid">{weekdays.map(d => <span key={d}>{d}</span>)}{miniDays.map(day => <button key={day} type="button" aria-label={`快速选择 ${day}`} aria-pressed={day === selected} className={`${day === selected ? "wc-selected" : ""} ${day.slice(0, 7) !== anchor.slice(0, 7) ? "wc-outside" : ""}`} onClick={() => choose(day)}>{Number(day.slice(8))}</button>)}</div></div>
           <div className="wc-day-summary"><h3>{dayTitle(selected)}{selected === today && <span>今天</span>}</h3><p>{dayEntries.length ? `${dayEntries.length} 项安排与节点` : "暂无已登记安排"}</p>{!dayEntries.length && <p className="wc-muted">未登记不代表空闲。</p>}
             <div className="wc-day-items">{dayEntries.map(e => <div key={e.id}><EntryLink entry={e} day={selected} today={today} />{e.projectName && <p className="wc-project-name">{e.projectName}</p>}{e.when === "time" && e.source === "work" && <Link className="wc-plan-link" href={e.href.replace(/\?task=.*/, "/personal-plan")}>核对个人计划</Link>}</div>)}</div>
           </div>
-          <div className="wc-management"><Link href="/schedule">管理课表与临时日程 ↗</Link><Link href="/projects">进入项目进行个人规划 ↗</Link><button type="button" onClick={() => setTab("tasks")}>查看任务列表与未定日期任务 →</button></div>
+          <div className="wc-management"><Link href="/schedule">管理课表与临时日程 ↗</Link><Link href="/projects">进入项目进行个人规划 ↗</Link>{!standalone && <button type="button" onClick={() => setTab("tasks")}>查看任务列表与未定日期任务 →</button>}</div>
         </aside></div>
       </>}
     </div>}
+  </section>;
+  return <MoveContext.Provider value={entry => propose(entry)}>
+    {expanded && <div aria-hidden style={{ height: inlineHeight }} />}
+    {expanded ? <dialog ref={expandedDialog} className="wc-expanded-dialog" aria-labelledby="workspace-calendar-title" onCancel={event => { event.preventDefault(); resizeCalendar(false); }} onClick={event => { if (event.target === event.currentTarget) resizeCalendar(false); }}>{panel}</dialog> : panel}
     {proposal && <dialog ref={moveDialog} className="m-auto w-full max-w-lg border-0 bg-transparent p-0 backdrop:bg-black/40" aria-labelledby="calendar-move-title" onCancel={e => { e.preventDefault();if (!moving) setProposal(null); }}><section className="ac-card space-y-4 p-6"><h2 id="calendar-move-title" className="font-semibold">调整「{proposal.entry.title}」时间</h2><p className="text-sm text-ink-soft">保持时长，检查课表和其他工作安排后再确认。</p><label className="block text-sm">新开始时间<input autoFocus className="ac-field" type="datetime-local" step={900} value={proposal.start} disabled={moving} onChange={e => { setProposal(p => p ? { ...p, start: e.target.value, requestId: crypto.randomUUID() } : p); setMovePreview(null); }} /></label>{movePreview && <div className="rounded-lg border border-line p-3 text-sm"><p>{entryTime({ ...proposal.entry, when: "time", source: proposal.entry.source === "work" ? "work" : "schedule", startAt: movePreview.startAt, endAt: movePreview.endAt }, proposal.start.slice(0,10))}（北京时间）</p>{movePreview.conflicts.length ? <ul className="mt-2 text-high">{movePreview.conflicts.map(c => <li key={c}>{c}</li>)}</ul> : <p className="mt-2 text-emerald-700">未发现已登记安排冲突</p>}</div>}{moveError && <p role="alert" className="text-sm text-high">{moveError}</p>}<div className="flex gap-2"><button type="button" className="ac-btn" disabled={moving || !proposal.start} onClick={() => void saveMove(!!movePreview && !movePreview.conflicts.length)}>{moving ? "正在核对…" : movePreview && !movePreview.conflicts.length ? "确认调整" : "检查时间冲突"}</button><button type="button" className="ac-btn-ghost" disabled={moving} onClick={() => setProposal(null)}>取消</button></div></section></dialog>}
-  </section></MoveContext.Provider>;
+  </MoveContext.Provider>;
 }
