@@ -38,9 +38,17 @@ export function QuickstartTour({ label = "开始页面操作指引" }: { label?:
         {
           element: '[data-tour="workspace-tasks"]',
           popover: {
-            title: "任务与日历",
+            title: "近期任务",
             description:
-              "切换任务列表与日历。日历按周、月或事项查看本人课表、已确认工作安排及项目截止节点；截止日期不占用工作时段。点击任务在当前页面查看详情。",
+              "查看优先需要推进的任务，点击任务在当前页面打开详情。通过“全部任务”可按日期、项目筛选或搜索所有指派给你的未完成任务。",
+          },
+        },
+        {
+          element: '[data-tour="workspace-calendar"]',
+          popover: {
+            title: "个人日历",
+            description:
+              "按周、月或事项查看本人课表、工作安排及项目截止节点。点击“放大日历”居中展开，收起后保留日期和筛选；截止节点不占用工作时段。",
           },
         },
         {
