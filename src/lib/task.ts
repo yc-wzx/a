@@ -20,6 +20,7 @@ import { recordTaskMutation } from "./task-events";
 import { lockTaskWriteAccess } from "./task-write-access";
 import { captureIterationTrend } from "./iteration-trend";
 import { projectAttachments } from "@/db/course-extensions-schema";
+import { dependencyPath } from "./dependency-path";
 
 // 任务写操作角色：admin + student（teacher 只读，设计文档 §5）
 export const TASK_WRITE_ROLES = ["admin", "student"];
@@ -355,19 +356,28 @@ export async function getTaskDetail(actorId: string, taskId: string) {
   return { ...row, assignees: (await assigneesByTask([row.id])).get(row.id) ?? [], labels: byTask.get(row.id) ?? [] };
 }
 
-// 设置 predecessor 的后置任务（先删旧再插新）。简单关联：仅防直接成环，不强制阻断执行。
+// Validate and replace dependencies under the same project lock as association edits.
 export async function setTaskSuccessors(
   actorId: string,
   predecessorId: string,
   successorIds: string[],
   opts?: { tx: DbTx },
-) {
-  const exec = opts?.tx ?? db;
+): Promise<void> {
+  if (!opts?.tx)
+    return db.transaction(tx => setTaskSuccessors(actorId, predecessorId, successorIds, { tx }));
+  const exec = opts.tx;
   const [pred] = await exec.select().from(tasks).where(eq(tasks.id, predecessorId));
   if (!pred) throw new AppError("任务不存在");
-  await requireTaskWrite(actorId, pred.projectId);
+  await lockTaskWriteAccess(exec, actorId, pred.projectId);
+  await exec.execute(sql`select pg_advisory_xact_lock(hashtext(${pred.projectId + ":task-associations"}))`);
+  const uniqueSuccessors = [...new Set(successorIds)];
+  const edges = await exec.select({
+    predecessorId: taskDependencies.predecessorId,
+    successorId: taskDependencies.successorId,
+  }).from(taskDependencies).innerJoin(tasks, eq(tasks.id, taskDependencies.predecessorId))
+    .where(eq(tasks.projectId, pred.projectId));
 
-  for (const sid of successorIds) {
+  for (const sid of uniqueSuccessors) {
     if (sid === predecessorId) throw new AppError("后置任务不可构成循环");
     const [s] = await exec
       .select({ projectId: tasks.projectId })
@@ -375,24 +385,22 @@ export async function setTaskSuccessors(
       .where(eq(tasks.id, sid));
     if (!s || s.projectId !== pred.projectId)
       throw new AppError("后置任务不属于该项目");
-    const [back] = await exec
-      .select({ id: taskDependencies.id })
-      .from(taskDependencies)
-      .where(
-        and(
-          eq(taskDependencies.predecessorId, sid),
-          eq(taskDependencies.successorId, predecessorId),
-        ),
-      );
-    if (back) throw new AppError("后置任务不可构成循环");
+    const path = dependencyPath(edges, sid, predecessorId);
+    if (path) {
+      const chain = [predecessorId, ...path];
+      const titles = await exec.select({ id: tasks.id, title: tasks.title }).from(tasks)
+        .where(and(eq(tasks.projectId, pred.projectId), inArray(tasks.id, chain)));
+      const names = new Map(titles.map(task => [task.id, task.title]));
+      throw new AppError(`后置任务不可构成循环：${chain.map(id => names.get(id) ?? "任务").join(" → ")}`);
+    }
   }
 
   const replace = async (tx: DbTx) => {
     await tx.delete(taskDependencies).where(eq(taskDependencies.predecessorId, predecessorId));
-    if (successorIds.length > 0) {
+    if (uniqueSuccessors.length > 0) {
       await tx
         .insert(taskDependencies)
-        .values(successorIds.map((sid) => ({ predecessorId, successorId: sid })));
+        .values(uniqueSuccessors.map((sid) => ({ predecessorId, successorId: sid })));
     }
   };
   if (opts?.tx) await replace(opts.tx);

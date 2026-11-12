@@ -7,10 +7,13 @@ import { DocumentQuestionAnswer } from "@/components/documents/document-question
 import { TaskLink } from "@/components/tasks/task-link";
 import { newRequestId } from "@/lib/request-id";
 import { AssistantLayout } from "./resizable-layout";
+import { ASSISTANT_WORKFLOWS, type AssistantWorkflow } from "@/lib/agent/workflow-catalog";
+import { ReportDownload } from "./report-download";
+import { AssistantMessageContent } from "./message-content";
 import "./assistant.css";
 type Conversation = { id: string; projectId: string; title: string | null; projectName: string };
 type Memory = { id: string; projectId: string | null; content: string; enabled: boolean };
-type Message = { role: "user" | "assistant"; content: string; drafts?: Draft[]; stopped?: boolean };
+type Message = { id?: string; role: "user" | "assistant"; content: string; drafts?: Draft[]; stopped?: boolean };
 type Option = { id: string; name: string };
 async function api(input?: unknown, query = "") {
   const r = await fetch("/api/assistant" + query, input ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) } : { cache: "no-store" });
@@ -23,8 +26,9 @@ export function AssistantWorkspace({ userId, projects, projectId, assistantName,
   const [pending, setPending] = useState(false), [loading, setLoading] = useState(false), [error, setError] = useState(""), [progress, setProgress] = useState("");
   const [mode, setMode] = useState<"chat" | "documents">("chat"), [memoryOpen, setMemoryOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
+  const [workflow, setWorkflow] = useState<AssistantWorkflow | "chat">("chat");
   const [memoryEdit, setMemoryEdit] = useState<Memory | null>(null), [memoryText, setMemoryText] = useState(""), [memoryScope, setMemoryScope] = useState<string>("");
-  const [last, setLast] = useState<{ text: string; requestId: string; conversationId: string } | null>(null);
+  const [last, setLast] = useState<{ text: string; requestId: string; conversationId: string; workflow?: AssistantWorkflow } | null>(null);
   const controller = useRef<AbortController | null>(null), selection = useRef(0), active = useRef(true), viewport = useRef<HTMLDivElement>(null), bottom = useRef(true);
   const refresh = useCallback(async () => { const d = await api(); if (active.current) { setConversations(d.conversations); setMemories(d.memories); } }, []);
   useEffect(() => { active.current = true; void refresh().catch(e => setError(e.message)); return () => { active.current = false; controller.current?.abort(); }; }, [refresh]);
@@ -52,10 +56,11 @@ export function AssistantWorkspace({ userId, projects, projectId, assistantName,
       let id = retry ? last?.conversationId : current;
       if (!id) { const c = await api({ op: "create", projectId }); id = c.id as string; setCurrent(id); await refresh(); }
       const requestId = retry ? last!.requestId : newRequestId();
-      setLast({ text, requestId, conversationId: id! });
+      const selectedWorkflow = retry ? last?.workflow : workflow === "chat" ? undefined : workflow;
+      setLast({ text, requestId, conversationId: id!, workflow: selectedWorkflow });
       setMessages(m => [...(retry ? m.slice(0, -2) : m), { role: "user", content: text }, { role: "assistant", content: "" }]);
       if (!retry) setInput("");
-      const r = await fetch("/api/assistant/stream", { method: "POST", headers: { "Content-Type": "application/json" }, signal: abort.signal, body: JSON.stringify({ requestId, projectId, conversationId: id, userText: text }) });
+      const r = await fetch("/api/assistant/stream", { method: "POST", headers: { "Content-Type": "application/json" }, signal: abort.signal, body: JSON.stringify({ requestId, projectId, conversationId: id, userText: text, workflow: selectedWorkflow }) });
       if (!r.ok) throw Error((await r.json()).error ?? "生成失败");
       const reader = r.body!.getReader(), decoder = new TextDecoder(); let buffer = "", complete = false;
       while (true) {
@@ -66,7 +71,7 @@ export function AssistantWorkspace({ userId, projects, projectId, assistantName,
           if (e.type === "delta") setMessages(m => m.map((x, i) => i === m.length - 1 ? { ...x, content: x.content + e.text } : x));
           if (e.type === "progress") setProgress(e.text);
           if (e.type === "error") throw Error(e.error);
-          if (e.type === "done") { complete = true; setMessages(m => m.map((x, i) => i === m.length - 1 ? { role: "assistant", content: e.result.text, drafts: e.result.drafts } : x)); setLast(null); }
+          if (e.type === "done") { complete = true; setMessages(m => m.map((x, i) => i === m.length - 1 ? { id: e.result.messageId, role: "assistant", content: e.result.text, drafts: e.result.drafts } : x)); setLast(null); }
         }
       }
       if (!complete) throw Error("连接提前中断，可核对历史后重试");
@@ -106,9 +111,19 @@ export function AssistantWorkspace({ userId, projects, projectId, assistantName,
       <div ref={viewport} onScroll={e => { const el = e.currentTarget; bottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }} className={`assistant-message-viewport ${!messages.length ? "is-empty" : ""}`} aria-live="polite">
         {loading && <p className="text-sm text-ink-faint">读取历史对话…</p>}
         {!messages.length && !loading && <div className="assistant-welcome"><h2>从当前项目的下一步开始</h2><p>查询项目进度、梳理待办，或拟定下一步目标。</p><div className="assistant-suggestions">{["帮我整理当前项目的待办和风险", "根据现有进度，为我拟定下一步任务", "列出我负责的任务，建议先做什么"].map((t, i) => <button key={t} onClick={() => setInput(t)}>{["整理待办和风险", "拟定下一步任务", "我应该先做什么"][i]} ↗</button>)}</div></div>}
-        {messages.map((m, i) => <article key={i} className={`assistant-message ${m.role === "user" ? "from-user" : "from-assistant"}`}><p className="mb-2 text-xs font-medium text-ink-faint">{m.role === "user" ? "我" : assistantName}</p><p className="whitespace-pre-wrap break-words text-sm leading-7">{m.content || (pending ? "正在处理…" : "本轮未生成完整回答")}</p>{m.stopped && <p className="mt-2 text-xs text-ink-faint">未完成 · 不会执行任务变更</p>}{m.role === "assistant" && m.content && <button className="mt-2 text-xs text-primary" onClick={() => void navigator.clipboard.writeText(m.content)}>复制</button>}{m.drafts?.length ? <DraftCards projectId={projectId} drafts={m.drafts} members={members} milestones={milestones} /> : null}</article>)}
+        {messages.map((m, i) => <article key={i} className={`assistant-message ${m.role === "user" ? "from-user" : "from-assistant"}`}><p className="mb-2 text-xs font-medium text-ink-faint">{m.role === "user" ? "我" : assistantName}</p>{m.role === "assistant" ? <AssistantMessageContent text={m.content || (pending ? "正在处理…" : "本轮未生成完整回答")} /> : <p className="whitespace-pre-wrap break-words text-sm leading-7">{m.content}</p>}{m.stopped && <p className="mt-2 text-xs text-ink-faint">未完成 · 不会执行任务变更</p>}{m.role === "assistant" && m.content && <button className="mt-2 text-xs text-primary" onClick={() => void navigator.clipboard.writeText(m.content)}>复制</button>}{m.role === "assistant" && m.id && !m.stopped && <ReportDownload messageId={m.id} />}{m.drafts?.length ? <DraftCards projectId={projectId} drafts={m.drafts} members={members} milestones={milestones} /> : null}</article>)}
       </div>
-      <form className="assistant-composer-area" onSubmit={e => { e.preventDefault(); void send(); }}><div className="assistant-composer"><textarea aria-label="向我的助手提问" value={input} onChange={e => setInput(e.target.value)} maxLength={4000} rows={3} placeholder="输入问题，或描述你要完成的项目工作…" disabled={loading} /><div className="assistant-compose-footer"><span role="status">{pending ? progress : configured ? "已使用个人模型配置" : "个人模型尚未配置"}</span>{!configured && <Link href="/settings#my-ai">前往设置 →</Link>}{pending ? <button type="button" className="ac-btn-ghost ml-auto" onClick={() => controller.current?.abort()}>停止生成</button> : <button className="ac-btn ml-auto" disabled={!configured || !projectId || !input.trim() || loading}>发送</button>}</div></div><p className="assistant-compose-rule">任务草案由你确认后保存；个人密钥与偏好记忆由你管理。</p></form>
+      <form className="assistant-composer-area" onSubmit={e => { e.preventDefault(); void send(); }}>
+        <label className="mb-2 flex items-center gap-3 text-xs text-ink-soft">工作流程
+          <select aria-label="助手工作流程" className="rounded border border-line bg-surface px-3 py-1.5" value={workflow} disabled={pending} onChange={event => {
+            const next = event.target.value as AssistantWorkflow | "chat";
+            const previousPrompt = workflow === "chat" ? "" : ASSISTANT_WORKFLOWS[workflow].prompt;
+            if (!input.trim() || input === previousPrompt) setInput(next === "chat" ? "" : ASSISTANT_WORKFLOWS[next].prompt);
+            setWorkflow(next);
+          }}><option value="chat">项目对话</option>{Object.entries(ASSISTANT_WORKFLOWS).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}</select>
+          {workflow === "minutes" && <span>在下方粘贴会议纪要，核对任务草案后保存。</span>}
+        </label>
+        <div className="assistant-composer"><textarea aria-label="向我的助手提问" value={input} onChange={e => setInput(e.target.value)} maxLength={4000} rows={3} placeholder="输入问题，或描述你要完成的项目工作…" disabled={loading} /><div className="assistant-compose-footer"><span role="status">{pending ? progress : configured ? "已使用个人模型配置" : "个人模型尚未配置"}</span>{!configured && <Link href="/settings#my-ai">前往设置 →</Link>}{pending ? <button type="button" className="ac-btn-ghost ml-auto" onClick={() => controller.current?.abort()}>停止生成</button> : <button className="ac-btn ml-auto" disabled={!configured || !projectId || !input.trim() || loading}>发送</button>}</div></div><p className="assistant-compose-rule">任务草案由你确认后保存；个人密钥与偏好记忆由你管理。</p></form>
     </>}
     {contextOpen && <aside className="assistant-context-panel" aria-label="项目上下文与个人记忆"><div className="mb-5 flex items-center justify-between"><h2 className="font-semibold">上下文与记忆</h2><button aria-label="关闭上下文面板" onClick={() => setContextOpen(false)} className="ac-btn-ghost">✕</button></div><section><h2 className="mb-3 text-sm font-semibold">当前项目</h2><p className="text-sm">{projects.find(p => p.id === projectId)?.name}</p><p className="mt-2 text-xs leading-5 text-ink-faint">项目数据在提问时重新核对权限与进度。任务讨论和私人日程内容不会自动加入。</p><div className="mt-3 max-h-56 space-y-2 overflow-y-auto">{tasks.slice(0, 12).map(t => <TaskLink key={t.id} href={`/projects/${projectId}?task=${t.id}`} className="block rounded-lg bg-surface p-2 text-xs">{t.status === "done" ? "✓" : "○"} {t.title}</TaskLink>)}</div>{projectId && <Link href={`/projects/${projectId}/ai-drafts`} className="mt-3 inline-block text-xs text-primary">迭代草案与项目助手 ↗</Link>}</section>
         <section className="border-t border-line pt-4"><div className="flex justify-between"><h2 className="text-sm font-semibold">我的记忆</h2><button className="text-xs text-primary" onClick={() => setMemoryOpen(!memoryOpen)}>{memoryOpen ? "收起" : "管理"}</button></div><p className="mt-2 text-xs leading-5 text-ink-faint">只保存你确认的工作偏好。禁用或删除后不再用于新回答。</p><p className="mt-2 text-xs">{memories.filter(m => m.enabled && (!m.projectId || m.projectId === projectId)).length} 条启用</p>

@@ -1,21 +1,44 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { discussionTaskOrigins } from "@/db/course-extensions-schema";
-import { retrospectives, taskComments, taskDiscussionMessages, tasks } from "@/db/schema";
+import { projectReferences, retrospectives, taskComments, taskDiscussionMessages, tasks } from "@/db/schema";
 import { createTask } from "./task";
 import { getProjectForUser } from "./project";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { lockTaskWriteAccess } from "./task-write-access";
 import { runIdempotent } from "./write-request";
 import { notifyTaskAssigned } from "./notify";
-const sourceSchema = z.object({sourceType:z.enum(["comment","discussion","retrospective"]),sourceId:z.uuid(),sourceTaskId:z.uuid().optional()});
+import { readProject } from "./project-read";
+import { assigneesByTask } from "./task-assignees";
+
+export async function listMeetingFollowups(actorId: string, projectId: string, meetingIds: string[]) {
+  return readProject(actorId, projectId, async tx => {
+    if (!meetingIds.length) return [];
+    const rows = await tx.select({ meetingId: discussionTaskOrigins.sourceId, id: tasks.id,
+      title: tasks.title, status: tasks.status, dueDate: tasks.dueDate,
+    }).from(discussionTaskOrigins).innerJoin(tasks, eq(tasks.id, discussionTaskOrigins.taskId))
+      .where(and(eq(discussionTaskOrigins.projectId, projectId), eq(tasks.projectId, projectId),
+        eq(discussionTaskOrigins.sourceType, "meeting"), inArray(discussionTaskOrigins.sourceId, meetingIds)))
+      .orderBy(tasks.createdAt, tasks.id);
+    const members = await assigneesByTask(rows.map(task => task.id), tx);
+    return rows.map(task => ({ ...task, assigneeNames: (members.get(task.id) ?? []).map(member => member.name) }));
+  });
+}
+const sourceSchema = z.object({sourceType:z.enum(["comment","discussion","retrospective","meeting"]),sourceId:z.uuid(),sourceTaskId:z.uuid().optional()});
 export async function createTaskFromSource(actorId:string,projectId:string,input:unknown) {
   const data = sourceSchema.extend({requestId:z.uuid(),title:z.string().trim().min(1).max(200),description:z.string().trim().max(10000),assigneeId:z.uuid().optional(),dueDate:z.iso.date().optional(),expectedSourceRevision:z.string().max(100),confirmShare:z.boolean().default(false)}).strict().parse(input);
   const result = await db.transaction(async tx => {
     await lockTaskWriteAccess(tx,actorId,projectId);
     let revision:string, sourceTaskId:string|null=null;
-    if(data.sourceType==="retrospective") {
+    if (data.sourceType === "meeting") {
+      const [meeting] = await tx.select().from(projectReferences).where(and(
+        eq(projectReferences.id, data.sourceId), eq(projectReferences.projectId, projectId),
+        eq(projectReferences.type, "meeting"),
+      )).for("share");
+      if (!meeting) throw new NotFoundError("会议记录已删除或不可访问");
+      revision = String(meeting.revision);
+    } else if(data.sourceType==="retrospective") {
       const [row]=await tx.select().from(retrospectives).where(and(eq(retrospectives.id,data.sourceId),eq(retrospectives.projectId,projectId))).for("share");
       if(!row)throw new NotFoundError("复盘已删除或不可访问");revision=String(row.revision);
     } else {
@@ -45,6 +68,13 @@ export async function getTaskOrigin(actorId:string,projectId:string,taskId:strin
   if(!await getProjectForUser(actorId,projectId))throw new ForbiddenError();
   const [origin]=await db.select().from(discussionTaskOrigins).where(and(eq(discussionTaskOrigins.taskId,taskId),eq(discussionTaskOrigins.projectId,projectId)));
   if(!origin)return null;
+  if (origin.sourceType === "meeting") {
+    const [meeting] = await db.select({ id: projectReferences.id }).from(projectReferences).where(and(
+      eq(projectReferences.id, origin.sourceId), eq(projectReferences.projectId, projectId), eq(projectReferences.type, "meeting"),
+    ));
+    return meeting ? { label: "来源：会议行动项", href: `/projects/${projectId}/references?referenceId=${meeting.id}#reference-${meeting.id}` }
+      : { label: "来源会议已删除", href: null };
+  }
   if(origin.sourceType==="retrospective") {
     const [r]=await db.select().from(retrospectives).where(and(eq(retrospectives.id,origin.sourceId),eq(retrospectives.projectId,projectId)));
     return r?{label:"来源：迭代复盘",href:`/projects/${projectId}/iterations/${r.iterationId}`}:{label:"来源复盘已不可访问",href:null};

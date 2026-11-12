@@ -10,6 +10,7 @@ import {
   listTaskComments,
   updateTaskComment,
   getCommentPageOffset,
+  highlightTaskComment,
 } from "@/lib/comments";
 import { getProjectForUser } from "@/lib/project";
 import { listTeamMembers } from "@/lib/team";
@@ -23,7 +24,7 @@ async function mutate<T>(run: (actor: string) => Promise<T>) {
 export async function getTaskCommentsAction(
   projectId: string,
   taskId: string,
-  paging: PageInput = {},
+  paging: PageInput & { highlightedOnly?: boolean } = {},
   focusCommentId?: string,
 ) {
   return runAction(async (actor) => {
@@ -36,6 +37,7 @@ export async function getTaskCommentsAction(
           taskId,
           focusCommentId,
           paging.limit ?? 20,
+          paging.highlightedOnly,
         )
       : undefined;
     return {
@@ -65,6 +67,14 @@ export async function createTaskCommentAction(
   input: Parameters<typeof createTaskComment>[3],
 ) {
   return mutate((actor) => createTaskComment(actor, projectId, taskId, input));
+}
+export async function highlightTaskCommentAction(
+  projectId: string,
+  taskId: string,
+  commentId: string,
+  input: Parameters<typeof highlightTaskComment>[4],
+) {
+  return mutate(actor => highlightTaskComment(actor, projectId, taskId, commentId, input));
 }
 export async function updateTaskCommentAction(
   projectId: string,

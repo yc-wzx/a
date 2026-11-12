@@ -84,11 +84,11 @@ export function TaskWorkspace(props: {
           })}
         </nav>
         <div className="project-task-toolbar-actions">{props.toolbar}</div>
-        {view === "list" && (
+        {(view === "list" || view === "board") && (
           <label className="flex items-center gap-2 text-xs text-ink-soft">
             排序
             <select
-              aria-label="列表排序"
+              aria-label="任务排序"
               className="ac-field w-auto py-1.5"
               value={sort}
               onChange={(e) =>
@@ -113,7 +113,7 @@ export function TaskWorkspace(props: {
         </p>
       )}
       {view === "board" ? (
-        <Board {...props} onOpenTask={open} />
+        <Board {...props} tasks={sorted} onOpenTask={open} />
       ) : view === "list" ? (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">
           <table className="w-full min-w-[680px] text-left text-sm">

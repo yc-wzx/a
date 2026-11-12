@@ -929,6 +929,9 @@ export const taskComments = pgTable(
     authorId: uuid("author_id").notNull(),
     body: text("body").notNull(),
     replyToId: uuid("reply_to_id"),
+    highlighted: boolean("highlighted").notNull().default(false),
+    highlightedBy: uuid("highlighted_by"),
+    highlightedAt: timestamp("highlighted_at", { withTimezone: true }),
     mentionedUserIds: jsonb("mentioned_user_ids")
       .$type<string[]>()
       .notNull()

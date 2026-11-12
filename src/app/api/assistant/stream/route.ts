@@ -8,11 +8,12 @@ import { runAgentTurn } from "@/lib/agent/orchestrator";
 import { requireScopedConversation } from "@/lib/agent/context";
 import { hashRequest } from "@/lib/write-request";
 import { AppError } from "@/lib/errors";
+import { ASSISTANT_WORKFLOW_IDS } from "@/lib/agent/workflow-catalog";
 export const maxDuration = 90;
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
-  const parsed = z.object({ requestId: z.uuid(), projectId: z.uuid(), conversationId: z.uuid(), userText: z.string().trim().min(1).max(4000) }).safeParse(await req.json().catch(() => ({})));
+  const parsed = z.object({ requestId: z.uuid(), projectId: z.uuid(), conversationId: z.uuid(), userText: z.string().trim().min(1).max(4000), workflow: z.enum(ASSISTANT_WORKFLOW_IDS).optional() }).safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "请输入有效的对话内容" }, { status: 400 });
   const d = parsed.data, actorId = session.user.id, where = and(eq(assistantRequests.userId, actorId), eq(assistantRequests.requestId, d.requestId));
   try { await requireScopedConversation(actorId, d.projectId, d.conversationId, "personal"); }

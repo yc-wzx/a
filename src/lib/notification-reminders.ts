@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { tasks, projects, teamMembers } from "@/db/schema";
+import { tasks, projects, teamMembers, taskDependencies } from "@/db/schema";
 import { recordNotificationIntent } from "./notification";
 import { assigneesByTask } from "./task-assignees";
 import { ValidationError } from "./errors";
@@ -53,6 +53,13 @@ export async function scanAndRecordDueReminders(now = new Date()) {
         )
           return { createdCount: 0 };
         const type = task.dueDate! < today ? "task.overdue" : "task.due_soon";
+        const blockers = await tx.select({ title: tasks.title }).from(taskDependencies)
+          .innerJoin(tasks, eq(tasks.id, taskDependencies.predecessorId))
+          .where(and(eq(taskDependencies.successorId, task.id), eq(tasks.projectId, task.projectId), ne(tasks.status, "done")))
+          .orderBy(tasks.id);
+        const blockingNote = blockers.length
+          ? `；前置未完成：${blockers.slice(0, 3).map(item => item.title.slice(0, 60)).join("、")}${blockers.length > 3 ? `等 ${blockers.length} 项` : ""}`
+          : "";
         return recordNotificationIntent(tx, {
           eventKey: `due:${type}:${task.id}:${task.assigneeId}:${task.dueDate}:${today}`,
           projectId: task.projectId,
@@ -60,7 +67,7 @@ export async function scanAndRecordDueReminders(now = new Date()) {
           type,
           recipientIds: [...new Set([task.assigneeId!, ...((await assigneesByTask([task.id], tx)).get(task.id) ?? []).map(m => m.id)])],
           summary:
-            `任务《${task.title}》${type === "task.overdue" ? "已逾期" : "即将到期"}（截止 ${task.dueDate}）`.slice(
+            `任务《${task.title}》${type === "task.overdue" ? "已逾期" : "即将到期"}（截止 ${task.dueDate}）${blockingNote}`.slice(
               0,
               500,
             ),
