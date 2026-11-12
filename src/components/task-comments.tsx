@@ -6,6 +6,7 @@ import {
   deleteTaskCommentAction,
   getTaskCommentsAction,
   updateTaskCommentAction,
+  highlightTaskCommentAction,
 } from "@/app/(app)/projects/[projectId]/tasks/comments/actions";
 import { collaborationAction } from "@/app/(app)/projects/[projectId]/tasks/collaboration-actions";
 import { newRequestId } from "@/lib/request-id";
@@ -36,6 +37,7 @@ export function TaskComments({
     [editing, setEditing] = useState<string | null>(null);
   useEffect(() => { onDirtyChange?.(!!body.trim()); }, [body, onDirtyChange]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [highlightedOnly, setHighlightedOnly] = useState(false);
   const [pending, start] = useTransition();
   const [requestId, setRequestId] = useState(newRequestId),
     [offset, setOffset] = useState(0);
@@ -44,7 +46,7 @@ export function TaskComments({
     getTaskCommentsAction(
       projectId,
       taskId,
-      { offset, limit: 20 },
+      { offset, limit: 20, highlightedOnly },
       focused.current !== focus ? focus : undefined,
     )
       .then((result) => {
@@ -64,7 +66,7 @@ export function TaskComments({
     return () => {
       active = false;
     };
-  }, [projectId, taskId, offset, focus, refreshVersion]);
+  }, [projectId, taskId, offset, focus, refreshVersion, highlightedOnly]);
   useEffect(() => {
     if (data && focus)
       document
@@ -76,6 +78,7 @@ export function TaskComments({
       const result = await getTaskCommentsAction(projectId, taskId, {
         offset: data?.page.offset ?? offset,
         limit: 20,
+        highlightedOnly,
       });
       if (result.ok) {
         setData(result.data);
@@ -89,20 +92,29 @@ export function TaskComments({
     let active = true, timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       if (!document.hidden) try {
-        const result = await getTaskCommentsAction(projectId, taskId, { offset, limit: 20 });
+        const result = await getTaskCommentsAction(projectId, taskId, { offset, limit: 20, highlightedOnly });
         if (active) { if (result.ok) { setData(result.data); setError(""); if (followLatest.current && result.data.page.nextOffset !== null) setOffset(Math.floor((result.data.page.total - 1) / 20) * 20); } else { setData(null); setError(result.error); } }
       } catch { if (active) setError("评论连接中断，正在重连；输入已保留"); }
       if (active) timer = setTimeout(poll, 1800);
     };
     timer = setTimeout(poll, 1800);
     return () => { active = false; clearTimeout(timer); };
-  }, [projectId, taskId, offset]);
+  }, [projectId, taskId, offset, highlightedOnly]);
   return (
     <section
       className="task-comments space-y-3 border-t border-line pt-4 [overflow-wrap:anywhere]"
       aria-label="团队评论"
     >
-      <h3 className="font-semibold">团队评论</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold">团队评论</h3>
+        <label className="flex items-center gap-2 text-xs text-ink-soft">
+          <input type="checkbox" checked={highlightedOnly} onChange={event => {
+            setHighlightedOnly(event.target.checked);
+            setOffset(0);
+            followLatest.current = !event.target.checked;
+          }} />只看重点
+        </label>
+      </div>
       {error && (
         <p role="alert" className="text-sm text-high">
           {error}{" "}
@@ -130,6 +142,17 @@ export function TaskComments({
           </p>
           {item.replyToId && <p className="border-l-2 border-line pl-2 text-xs text-ink-faint">回复：{data.page.items.find(m => m.id === item.replyToId)?.body.slice(0, 80) ?? "较早的团队评论"}</p>}
           <p className="whitespace-pre-wrap">{item.body}</p>
+          {item.highlighted && <span className="inline-block rounded bg-accent-soft px-2 py-1 text-xs text-accent">重点评论</span>}
+          {data.canWrite && ["admin", "teacher"].includes(data.role) && <button
+            type="button" disabled={pending} className="ml-2 text-xs text-primary"
+            onClick={() => start(async () => {
+              const result = await highlightTaskCommentAction(projectId, taskId, item.id, {
+                requestId: newRequestId(), expectedRevision: item.revision, highlighted: !item.highlighted,
+              });
+              if (!result.ok) setError(result.error);
+              await reload();
+            })}
+          >{item.highlighted ? "取消重点" : "标为重点"}</button>}
           {data.canWrite && data.role !== "teacher" && <SourceTaskButton projectId={projectId} sourceType="comment" sourceId={item.id} revision={String(item.revision)} text={item.body} />}
           <div className="flex gap-3 text-xs text-primary"><button type="button" disabled={!data.canWrite} onClick={() => { setReplyTo(item.id); setEditing(null); }}>回复</button><button type="button" disabled={!data.canWrite} onClick={async () => { const enabled = !data.reactions.some(r => r.messageId === item.id && r.userId === data.actorId); const r = await collaborationAction(projectId, taskId, { op: "react", channel: "team", messageId: item.id, enabled }); if (!r.ok) setError(r.error); else await reload(); }}>收到 {data.reactions.filter(r => r.messageId === item.id).length || ""}</button></div>
           {item.mentionedUserIds.length > 0 && (

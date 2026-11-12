@@ -11,6 +11,10 @@ import { ReferenceForm, DeleteReferenceForm } from "./reference-form";
 import { ProjectNav } from "@/components/projects/project-nav";
 import { ProjectAttachments } from "@/components/attachments/project-attachments";
 import { ReferencePreview } from "@/components/attachments/reference-preview";
+import { SourceTaskButton } from "@/components/tasks/source-task";
+import { TaskLink } from "@/components/tasks/task-link";
+import { listMeetingFollowups } from "@/lib/source-tasks";
+import { AttachmentOverview } from "@/components/attachments/attachment-overview";
 
 export default async function ReferencesPage({
   params,
@@ -39,8 +43,10 @@ export default async function ReferencesPage({
     listProjectMilestones(session.user.id, projectId),
   ]);
   const path = "/projects/" + projectId + "/references";
+  const followups = await listMeetingFollowups(session.user.id, projectId,
+    references.items.filter(record => record.type === "meeting").map(record => record.id));
   return (
-    <main className="mx-auto max-w-3xl space-y-6 py-8">
+    <main className="mx-auto max-w-5xl space-y-6 py-8">
       <ProjectNav projectId={projectId} current="references" />
       <header className="space-y-2">
         <Link
@@ -54,6 +60,7 @@ export default async function ReferencesPage({
           {access.project.name} · 集中保存外部资料，点击卡片打开原链接。
         </p>
       </header>
+      <AttachmentOverview projectId={projectId} />
       <nav aria-label="资料类型" className="flex flex-wrap gap-2">
         <Link
           href={path}
@@ -118,6 +125,17 @@ export default async function ReferencesPage({
                 {record.note}
               </p>
             )}
+            {record.type === "meeting" && <section className="space-y-3 border-t border-line pt-3" aria-label={`${record.title}后续任务`}>
+              <h3 className="text-sm font-medium">会议后续任务</h3>
+              {followups.filter(task => task.meetingId === record.id).map(task => <TaskLink key={task.id}
+                href={`/projects/${projectId}?task=${task.id}`} className="flex items-center justify-between gap-3 text-sm text-primary">
+                <span>{task.status === "done" ? "✓ " : "○ "}{task.title}</span>
+                <span className="shrink-0 text-xs text-ink-soft">{task.assigneeNames.join("、") || "待指派"} · {task.status === "done" ? "已完成" : task.status === "doing" ? "进行中" : "待办"}{task.dueDate && ` · ${task.dueDate}`}</span>
+              </TaskLink>)}
+              {access.role !== "teacher" && access.project.status !== "archived" && <SourceTaskButton
+                projectId={projectId} sourceType="meeting" sourceId={record.id} revision={String(record.revision)}
+                text={record.note || record.title} members={members.map(member => ({ id: member.id, name: member.name }))} />}
+            </section>}
             {(record.minutesUrl || record.recordingUrl) && (
               <div className="flex flex-wrap gap-3 text-sm">
                 {record.minutesUrl && (

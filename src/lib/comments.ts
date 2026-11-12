@@ -31,12 +31,13 @@ export async function getCommentPageOffset(
   taskId: string,
   commentId: string,
   limit = 20,
+  highlightedOnly = false,
 ) {
   z.uuid().parse(commentId);
   z.number().int().min(1).max(100).parse(limit);
   return readProject(actorId, projectId, async (tx) => {
     const [target] = await tx.execute<{ offset: number }>(
-      sql`with ordered as(select id,row_number() over(order by created_at,id)-1 position from task_comments where project_id=${projectId} and task_id=${taskId} and deleted_at is null) select (floor(position::numeric/${limit})*${limit})::int as "offset" from ordered where id=${commentId}`,
+      sql`with ordered as(select id,row_number() over(order by created_at,id)-1 position from task_comments where project_id=${projectId} and task_id=${taskId} and deleted_at is null and (${!highlightedOnly} or highlighted)) select (floor(position::numeric/${limit})*${limit})::int as "offset" from ordered where id=${commentId}`,
     );
     return target?.offset ?? null;
   });
@@ -53,6 +54,7 @@ export type CommentItem = {
   revision: number;
   createdAt: string;
   updatedAt: string;
+  highlighted: boolean;
 };
 async function dto(tx: typeof db | DbTx, row: Row): Promise<CommentItem> {
   const [user] = await tx
@@ -71,6 +73,7 @@ async function dto(tx: typeof db | DbTx, row: Row): Promise<CommentItem> {
     revision: row.revision,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    highlighted: row.highlighted,
   };
 }
 async function requireTask(
@@ -174,7 +177,7 @@ export async function listTaskComments(
   actorId: string,
   projectId: string,
   taskId: string,
-  paging: PageInput = {},
+  paging: PageInput & { highlightedOnly?: boolean } = {},
 ) {
   if (!(await getProjectForUser(actorId, projectId)))
     throw new ForbiddenError();
@@ -184,6 +187,7 @@ export async function listTaskComments(
     eq(taskComments.projectId, projectId),
     eq(taskComments.taskId, taskId),
     isNull(taskComments.deletedAt),
+    paging.highlightedOnly ? eq(taskComments.highlighted, true) : undefined,
     sql`exists(select 1 from projects p join team_members m on p.team_id=m.team_id where p.id=${taskComments.projectId} and m.user_id=${actorId})`,
   );
   const [count] = await db
@@ -248,6 +252,37 @@ export async function createTaskComment(
         })
         .returning();
       await event(tx, actorId, row, "comment.created", recipients);
+      return dto(tx, row);
+    },
+  );
+}
+export async function highlightTaskComment(
+  actorId: string,
+  projectId: string,
+  taskId: string,
+  commentId: string,
+  input: { requestId: string; expectedRevision: number; highlighted: boolean },
+) {
+  const data = deleteSchema.extend({ highlighted: z.boolean() }).parse(input);
+  return projectMutation(
+    { actorId, projectId, operation: "comment.highlight", requestId: data.requestId },
+    { taskId, commentId, ...data },
+    ["admin", "teacher"],
+    async tx => {
+      const [old] = await tx.select().from(taskComments).where(and(
+        eq(taskComments.id, commentId), eq(taskComments.taskId, taskId),
+        eq(taskComments.projectId, projectId), isNull(taskComments.deletedAt),
+      )).for("update");
+      if (!old) throw new NotFoundError("评论已删除或不可访问");
+      if (old.revision !== data.expectedRevision) throw new ConflictError("评论已变化，请刷新后再标记");
+      const [row] = await tx.update(taskComments).set({
+        highlighted: data.highlighted,
+        highlightedBy: data.highlighted ? actorId : null,
+        highlightedAt: data.highlighted ? new Date() : null,
+        revision: old.revision + 1,
+        updatedAt: sql`clock_timestamp()`,
+      }).where(eq(taskComments.id, old.id)).returning();
+      await event(tx, actorId, row, "comment.updated", []);
       return dto(tx, row);
     },
   );

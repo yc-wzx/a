@@ -21,7 +21,7 @@ export const projectAttachments = pgTable("project_attachments", {
 export const discussionTaskOrigins = pgTable("discussion_task_origins", {
   taskId: uuid("task_id").primaryKey().references(() => tasks.id, { onDelete: "cascade" }),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
-  sourceType: text("source_type").notNull().$type<"comment" | "discussion" | "retrospective">(),
+  sourceType: text("source_type").notNull().$type<"comment" | "discussion" | "retrospective" | "meeting">(),
   sourceId: uuid("source_id").notNull(),
   sourceTaskId: uuid("source_task_id"),
   sourceRevision: text("source_revision").notNull(),

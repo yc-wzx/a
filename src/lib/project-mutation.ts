@@ -41,7 +41,7 @@ export async function projectMutation<T>(
         if (
           !comment ||
           (key.operation !== "comment.delete" && comment.deleted) ||
-          (comment.authorId !== key.actorId && role !== "admin")
+          (key.operation !== "comment.highlight" && comment.authorId !== key.actorId && role !== "admin")
         )
           throw new ForbiddenError("评论已删除或操作权限已变化");
       }

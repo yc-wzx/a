@@ -28,7 +28,7 @@ export async function persistTurn(
   toolTrace: ToolTraceEntry[],
   exec: typeof db | import("@/db").DbTx = db,
 ) {
-  await exec.insert(messages).values([
+  const inserted = await exec.insert(messages).values([
     { conversationId, role: "user", content: userText },
     {
       conversationId,
@@ -36,7 +36,8 @@ export async function persistTurn(
       content: assistantText,
       toolCalls: toolTrace.length > 0 ? toolTrace : null,
     },
-  ]);
+  ]).returning({ id: messages.id, role: messages.role });
+  return inserted.find(message => message.role === "assistant")!.id;
 }
 
 export async function listConversationMessages(

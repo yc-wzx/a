@@ -183,6 +183,13 @@
       "when": 1792486849387,
       "tag": "0025_calendar_refresh_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794495197642,
+      "tag": "0026_comment_highlights",
+      "breakpoints": true
     }
   ]
 }
