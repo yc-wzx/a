@@ -1,6 +1,7 @@
 "use client";
 
 import { MemberPicker } from "@/components/tasks/member-picker";
+import { Plus } from "lucide-react";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { emptyTaskDraft, hasTaskDraft, readTaskDraft, taskDraftKey, type TaskCreationDraft } from "@/lib/task-creation-draft";
 import { installUnsavedChangesGuard } from "@/lib/unsaved-changes";
@@ -19,6 +20,7 @@ export function NewTaskForm({ projectId, userId, members, milestones, iterations
   const [ready, setReady] = useState(false);
   const [storageError, setStorageError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const unsaved = useRef(false);
   const key = taskDraftKey(userId, projectId);
 
@@ -29,6 +31,8 @@ export function NewTaskForm({ projectId, userId, members, milestones, iterations
         // Hydrate the browser-owned draft after the server render.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setDraft(restored);
+        setAdvancedOpen(Boolean(restored.description || restored.iterationId || restored.milestoneId
+          || restored.startDate || restored.priority !== "medium"));
         setSaved(true);
         if (detailsRef.current) detailsRef.current.open = true;
       }
@@ -55,7 +59,7 @@ export function NewTaskForm({ projectId, userId, members, milestones, iterations
     if (hasTaskDraft(draft) && !window.confirm("确定清除这份未发布的任务草稿吗？")) return;
     try { localStorage.removeItem(key); setStorageError(""); }
     catch { setStorageError("清除失败，请检查浏览器存储设置后重试。"); return; }
-    setDraft(emptyTaskDraft()); setSaved(false); unsaved.current = false;
+    setDraft(emptyTaskDraft()); setAdvancedOpen(false); setSaved(false); unsaved.current = false;
   }
   const [state, formAction, pending] = useActionState<FormState, FormData>(async (previous, form) => {
     try {
@@ -64,7 +68,7 @@ export function NewTaskForm({ projectId, userId, members, milestones, iterations
         try {
           if (readTaskDraft(localStorage.getItem(key))?.requestId === form.get("requestId")) localStorage.removeItem(key);
         } catch { setStorageError("任务已发布，浏览器草稿清理失败。再次提交相同草稿会返回同一任务。"); }
-        setDraft(emptyTaskDraft()); setSaved(false); unsaved.current = false;
+        setDraft(emptyTaskDraft()); setAdvancedOpen(false); setSaved(false); unsaved.current = false;
       }
       return result;
     } catch { return { error: "暂时无法确认创建结果，草稿已保留，可重试同一次提交或刷新核对。" }; }
@@ -72,27 +76,70 @@ export function NewTaskForm({ projectId, userId, members, milestones, iterations
   const missingMembers = draft.assigneeIds.some(id => !members.some(member => member.id === id));
   const missingIteration = !!draft.iterationId && !iterations.some(row => row.id === draft.iterationId);
   const missingMilestone = !!draft.milestoneId && !milestones.some(row => row.id === draft.milestoneId);
+  const hasAdvancedValues = Boolean(draft.description || draft.iterationId || draft.milestoneId
+    || draft.startDate || draft.priority !== "medium");
 
   return <details ref={detailsRef} className="project-new-task">
-    <summary className="ac-btn cursor-pointer">＋ 新建任务{saved && <span className="ml-2 text-xs">有草稿</span>}</summary>
+    <summary className="ac-btn cursor-pointer"><Plus size={15} aria-hidden />新建任务{saved && <span className="ml-2 text-xs">有草稿</span>}</summary>
     {ready && <form ref={formRef} id="new-task" className="project-new-task-form scroll-mt-24 space-y-4 p-5"
       onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); startTransition(() => formAction(form)); }}>
       <fieldset disabled={pending} className="space-y-4">
-        <div className="flex items-center justify-between gap-3"><h2 className="font-medium text-ink">新建任务</h2><button type="button" className="text-xs text-ink-soft hover:text-high" onClick={clearDraft}>清除草稿</button></div>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-ink">新建任务</h2>
+          {hasTaskDraft(draft) && <button type="button" className="text-xs text-ink-soft hover:text-high" onClick={clearDraft}>清除草稿</button>}
+        </div>
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="requestId" value={draft.requestId} />
         <input type="hidden" name="iterationRevision" value={iterations.find(row => row.id === draft.iterationId)?.revision ?? ""} />
-        <input name="title" aria-label="新任务标题" required maxLength={200} placeholder="任务标题" className="ac-field" value={draft.title} onChange={event => change({ title: event.target.value })} />
-        <textarea name="description" aria-label="任务描述" maxLength={10000} placeholder="任务描述（可选）" rows={2} className="ac-field" value={draft.description} onChange={event => change({ description: event.target.value })} />
+        <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-3">
+          <label className="space-y-1 text-sm text-ink-soft">
+            任务标题
+            <input name="title" aria-label="新任务标题" required maxLength={200} placeholder="需要完成什么工作" className="ac-field" value={draft.title} onChange={event => change({ title: event.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm text-ink-soft">
+            截止日期
+            <input type="date" name="dueDate" className="ac-field" value={draft.dueDate} onChange={event => change({ dueDate: event.target.value })} />
+          </label>
+        </div>
         <MemberPicker members={members} selected={draft.assigneeIds} onChange={assigneeIds => change({ assigneeIds })} />
         {missingMembers && <p role="alert" className="text-sm text-high">部分已选成员已离开团队。<button type="button" className="ml-2 underline" onClick={() => change({ assigneeIds: draft.assigneeIds.filter(id => members.some(member => member.id === id)) })}>移除失效成员</button></p>}
-        <div className="grid grid-cols-3 items-end gap-3">
-          <label className="space-y-1 text-xs text-ink-soft">所属迭代<select name="iterationId" className="ac-field" value={draft.iterationId} onChange={event => change({ iterationId: event.target.value })}><option value="">暂放任务池</option>{missingIteration && <option disabled value={draft.iterationId}>原迭代已失效，请重新选择</option>}{iterations.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
-          <label className="space-y-1 text-xs text-ink-soft">里程碑<select name="milestoneId" className="ac-field" value={draft.milestoneId} onChange={event => change({ milestoneId: event.target.value })}><option value="">无里程碑</option>{missingMilestone && <option disabled value={draft.milestoneId}>原里程碑已失效，请重新选择</option>}{milestones.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}</select></label>
-          <label className="space-y-1 text-xs text-ink-soft">优先级<select name="priority" className="ac-field" value={draft.priority} onChange={event => change({ priority: event.target.value as TaskCreationDraft["priority"] })}><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
-          <label className="space-y-1 text-xs text-ink-soft">开始日期<input type="date" name="startDate" className="ac-field" value={draft.startDate} onChange={event => change({ startDate: event.target.value })} /></label>
-          <label className="space-y-1 text-xs text-ink-soft">截止日期<input type="date" name="dueDate" className="ac-field" value={draft.dueDate} onChange={event => change({ dueDate: event.target.value })} /></label>
-        </div>
+        <details open={advancedOpen} onToggle={event => setAdvancedOpen(event.currentTarget.open)} className="border-t border-line pt-3">
+          <summary className="cursor-pointer text-sm text-ink-soft">更多选项{hasAdvancedValues ? "（已设置）" : ""}</summary>
+          <div className="mt-4 space-y-3">
+            <label className="block space-y-1 text-sm text-ink-soft">
+              任务描述
+              <textarea name="description" maxLength={10000} placeholder="补充工作要求或完成条件（可选）" rows={2} className="ac-field" value={draft.description} onChange={event => change({ description: event.target.value })} />
+            </label>
+            <div className="grid grid-cols-2 items-end gap-3">
+              <label className="space-y-1 text-xs text-ink-soft">
+                所属迭代
+                <select name="iterationId" className="ac-field" value={draft.iterationId} onChange={event => change({ iterationId: event.target.value })}>
+                  <option value="">暂放任务池</option>
+                  {missingIteration && <option disabled value={draft.iterationId}>原迭代已失效，请重新选择</option>}
+                  {iterations.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs text-ink-soft">
+                里程碑
+                <select name="milestoneId" className="ac-field" value={draft.milestoneId} onChange={event => change({ milestoneId: event.target.value })}>
+                  <option value="">无里程碑</option>
+                  {missingMilestone && <option disabled value={draft.milestoneId}>原里程碑已失效，请重新选择</option>}
+                  {milestones.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs text-ink-soft">
+                优先级
+                <select name="priority" className="ac-field" value={draft.priority} onChange={event => change({ priority: event.target.value as TaskCreationDraft["priority"] })}>
+                  <option value="low">低</option><option value="medium">中</option><option value="high">高</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-xs text-ink-soft">
+                开始日期
+                <input type="date" name="startDate" className="ac-field" value={draft.startDate} onChange={event => change({ startDate: event.target.value })} />
+              </label>
+            </div>
+          </div>
+        </details>
         {state?.error && <p role="alert" className="text-sm text-high">{state.error}</p>}
         {storageError && <p role="alert" className="text-sm text-high">{storageError}</p>}
         {(missingIteration || missingMilestone) && <p role="alert" className="text-sm text-high">草稿中的迭代或里程碑已结束、删除或失去访问权限，请重新选择。</p>}
