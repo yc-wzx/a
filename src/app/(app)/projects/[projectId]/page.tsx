@@ -98,6 +98,8 @@ export default async function ProjectPage({
 
       {canWrite && (
         <NewTaskForm
+          key={`${session.user.id}:${projectId}`}
+          userId={session.user.id}
           projectId={projectId}
           iterations={iterationPage.items.filter(i => i.status !== "completed").map(i => ({ id: i.id, name: i.name, revision: i.revision }))}
           members={members}
@@ -121,6 +123,7 @@ export default async function ProjectPage({
           notice={<ProjectDoingLimitControl data={doingLimit} />}
           projectId={projectId}
           today={today}
+          iterations={iterationPage.items.map(row => ({ id: row.id, name: row.name, revision: row.revision, status: row.status }))}
           groupBy={filters.group}
           tasks={visibleTasks.map((t) => ({
             id: t.id,
@@ -137,6 +140,8 @@ export default async function ProjectPage({
             milestoneId: t.milestoneId,
             labels: t.labels,
             parentTaskId: t.parentTaskId,
+            sprintId: t.sprintId,
+            updatedAt: t.updatedAt.toISOString(),
           }))}
           canWrite={canWrite}
           doingLimit={doingLimit}

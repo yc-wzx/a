@@ -1,11 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getFeishuConfiguration } from "@/lib/feishu-configuration";
 
 const BASE = process.env.FEISHU_BASE_URL ?? "https://open.feishu.cn";
 
 // 发起飞书 OAuth——登录与绑定共用。用途由 callback 按 session 有无分流。
-export async function GET() {
+export async function GET(request: Request) {
+  if (!getFeishuConfiguration().login) {
+    return NextResponse.redirect(new URL("/login?feishu=unconfigured", request.url));
+  }
   const state = randomBytes(16).toString("hex");
   const store = await cookies();
   store.set("feishu_oauth_state", state, {

@@ -47,7 +47,8 @@ import { recordNotificationIntent } from "./notifications";
 import { ConflictError, NotFoundError, ValidationError, isUniqueViolation } from "./errors";
 import { normalizePage, pageResult } from "./pagination";
 import { getProjectForUser } from "./project";
-import { createTask, requireTaskWrite } from "./task";
+import { createTask, requireTaskWrite, updateTask } from "./task";
+import { bulkTaskUpdateSchema, type BulkTaskUpdate, type BulkTaskResult } from "@/contracts/task-bulk";
 import { SUMMARY_COLS, backlogWhere, toTaskSummary, type TaskRow } from "./task-contract";
 import { lockTaskWriteAccess } from "./task-write-access";
 import { runIdempotent } from "./write-request";
@@ -681,13 +682,13 @@ async function moveTasks(
       if (task.sprintId === iterationId) continue;
       await tx
         .update(tasks)
-        .set({ sprintId: iterationId, updatedAt: sql`now()` })
+        .set({ sprintId: iterationId, updatedAt: sql`greatest(date_trunc('milliseconds', clock_timestamp()), date_trunc('milliseconds', ${tasks.updatedAt}) + interval '1 millisecond')` })
         .where(eq(tasks.id, task.id));
     } else {
       if (task.sprintId !== iterationId) continue;
       await tx
         .update(tasks)
-        .set({ sprintId: null, updatedAt: sql`now()` })
+        .set({ sprintId: null, updatedAt: sql`greatest(date_trunc('milliseconds', clock_timestamp()), date_trunc('milliseconds', ${tasks.updatedAt}) + interval '1 millisecond')` })
         .where(eq(tasks.id, task.id));
     }
     touched.push(task.id);
@@ -763,6 +764,76 @@ export async function removeTasks(
       () => moveTasks(tx, actorId, projectId, iterationId, input, "remove"),
     ),
   );
+}
+
+/** The manual bulk editor uses the same task mutations and iteration move rules atomically. */
+export async function bulkUpdateTasks(actorId: string, projectId: string, raw: BulkTaskUpdate): Promise<BulkTaskResult> {
+  const parsed = bulkTaskUpdateSchema.safeParse(raw);
+  if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
+  const input = parsed.data;
+  await requireTaskWrite(actorId, projectId);
+  return db.transaction(tx => runIdempotent(tx,
+    requestKey(projectId, actorId, "task.bulk_update", input.requestId), input, async () => {
+      const ids = input.tasks.map(row => row.taskId).sort();
+      const lockedIterations = new Map<string, IterationRow>();
+      if (input.iteration) {
+        const locations = await tx.select({ id: tasks.sprintId }).from(tasks)
+          .where(and(eq(tasks.projectId, projectId), inArray(tasks.id, ids)));
+        const iterationIds = new Set(locations.flatMap(row => row.id ? [row.id] : []));
+        if (input.iteration.id) iterationIds.add(input.iteration.id);
+        for (const id of [...iterationIds].sort()) {
+          const version = input.iteration.versions.find(row => row.id === id);
+          if (!version) throw new ConflictError("迭代信息已变化，请刷新后重新预览");
+          lockedIterations.set(id, await lockIteration(tx, projectId, id, version.revision));
+        }
+      }
+      const selected = await tx.select().from(tasks)
+        .where(and(eq(tasks.projectId, projectId), inArray(tasks.id, ids))).orderBy(tasks.id).for("update");
+      if (selected.length !== ids.length) throw new NotFoundError("部分任务已删除或不属于该项目，请重新选择");
+      for (const task of selected) {
+        const expected = input.tasks.find(row => row.taskId === task.id)!;
+        if (new Date(expected.expectedUpdatedAt).getTime() !== task.updatedAt.getTime()) {
+          throw new ConflictError(`任务「${task.title}」已被修改，请刷新后重新预览`);
+        }
+        if (input.iteration && task.sprintId && !lockedIterations.has(task.sprintId)) {
+          throw new ConflictError("任务所属迭代已变化，请刷新后重新预览");
+        }
+        if (input.iteration && task.parentTaskId) {
+          throw new ValidationError("子任务跟随主任务所属迭代，请只为主任务调整迭代");
+        }
+      }
+      const changed = new Set<string>();
+      for (const task of selected) {
+        const different = Object.entries(input.patch).some(([key, value]) => task[key as keyof typeof input.patch] !== value);
+        if (different) {
+          await updateTask(actorId, task.id, input.patch, { tx, expectedUpdatedAt: task.updatedAt });
+          changed.add(task.id);
+        }
+      }
+      if (input.iteration) {
+        const targetId = input.iteration.id;
+        const moving = selected.filter(task => task.sprintId !== targetId);
+        const sources = new Set(moving.flatMap(task => task.sprintId ? [task.sprintId] : []));
+        for (const sourceId of [...sources].sort()) {
+          const sourceTasks = moving.filter(task => task.sprintId === sourceId).map(task => task.id);
+          const current = await tx.select({ taskId: tasks.id, updatedAt: tasks.updatedAt }).from(tasks).where(inArray(tasks.id, sourceTasks)).orderBy(tasks.id);
+          await moveTasks(tx, actorId, projectId, sourceId, {
+            requestId: input.requestId, expectedRevision: lockedIterations.get(sourceId)!.revision,
+            tasks: current.map(row => ({ taskId: row.taskId, expectedUpdatedAt: row.updatedAt.toISOString() })),
+          }, "remove");
+        }
+        if (targetId && moving.length) {
+          const current = await tx.select({ taskId: tasks.id, updatedAt: tasks.updatedAt }).from(tasks).where(inArray(tasks.id, moving.map(task => task.id))).orderBy(tasks.id);
+          await moveTasks(tx, actorId, projectId, targetId, {
+            requestId: input.requestId, expectedRevision: lockedIterations.get(targetId)!.revision,
+            tasks: current.map(row => ({ taskId: row.taskId, expectedUpdatedAt: row.updatedAt.toISOString() })),
+          }, "assign");
+        }
+        for (const task of moving) changed.add(task.id);
+      }
+      return { taskIds: [...changed] };
+    },
+  ));
 }
 
 /**

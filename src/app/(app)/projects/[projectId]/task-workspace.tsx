@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { Columns3, List, ChartGantt } from "lucide-react";
@@ -16,6 +16,7 @@ import { deriveColumns } from "@/lib/board-columns";
 import type { GroupBy } from "@/lib/board-filters";
 import { Board, type BoardTask } from "./board";
 import type { Option } from "./task-card";
+import { BulkTaskEdit, type BulkEditableTask, type BulkIteration } from "./bulk-task-edit";
 
 const STATUS = { todo: "待办", doing: "进行中", done: "已完成" };
 const PRIORITY: Record<string, string> = {
@@ -27,7 +28,8 @@ const ICONS = { board: Columns3, list: List, gantt: ChartGantt };
 
 export function TaskWorkspace(props: {
   projectId: string;
-  tasks: BoardTask[];
+  tasks: BulkEditableTask[];
+  iterations: BulkIteration[];
   groupBy: GroupBy;
   canWrite: boolean;
   members: Option[];
@@ -44,6 +46,15 @@ export function TaskWorkspace(props: {
     pathname = usePathname(),
     search = useSearchParams();
   const [pending, startTransition] = useTransition();
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [message, setMessage] = useState("");
+  const selected = tasks.filter(task => selectedIds.includes(task.id));
+  function toggleTask(id: string) {
+    const visibleIds = selected.map(task => task.id);
+    setSelectedIds(visibleIds.includes(id) ? visibleIds.filter(value => value !== id) : [...visibleIds, id]);
+  }
   const view = parseTaskView(search.get("view")),
     sort = parseTaskSort(search.get("sort"));
   const rawId = search.get("task");
@@ -74,7 +85,7 @@ export function TaskWorkspace(props: {
                 type="button"
                 key={key}
                 aria-pressed={view === key}
-                onClick={() => change("view", key === "board" ? null : key)}
+                onClick={() => { setSelecting(false); setSelectedIds([]); change("view", key === "board" ? null : key); }}
                 className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors ${view === key ? "bg-primary-soft text-primary" : "text-ink-soft hover:bg-sunken"}`}
               >
                 <Icon size={15} aria-hidden />
@@ -105,7 +116,18 @@ export function TaskWorkspace(props: {
             </select>
           </label>
         )}
+        {props.canWrite && <button type="button" className="ac-btn-ghost text-xs" aria-pressed={selecting} onClick={() => {
+          setSelecting(!selecting); setSelectedIds([]); setMessage("");
+          if (!selecting && view !== "list") change("view", "list");
+        }}>{selecting ? "结束选择" : "批量编辑"}</button>}
       </div>
+      {selecting && view === "list" && <div className="flex items-center gap-4 rounded-xl bg-primary-soft px-4 py-3 text-sm">
+        <span role="status">已选 {selected.length} 项</span><button type="button" className="text-primary disabled:opacity-40" disabled={!selected.length} onClick={() => setEditing(true)}>编辑所选任务</button><span className="ml-auto text-xs text-ink-soft">每次最多选择 50 项</span>
+      </div>}
+      {message && <p role="status" className="text-sm text-done">{message}</p>}
+      {editing && <BulkTaskEdit projectId={props.projectId} tasks={selected} iterations={props.iterations} onClose={() => setEditing(false)} onSaved={count => {
+        setEditing(false); setSelectedIds([]); setSelecting(false); setMessage(`已更新 ${count} 项任务。`); router.refresh();
+      }} />}
       {props.notice}
       {tasks.length === 0 && (
         <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-ink-soft">
@@ -122,6 +144,7 @@ export function TaskWorkspace(props: {
             </caption>
             <thead className="bg-sunken text-xs text-ink-soft">
               <tr>
+                {selecting && <th scope="col" className="w-10 px-3 py-3"><input type="checkbox" aria-label="选择当前列表任务（最多50项）" checked={tasks.length > 0 && selected.length === Math.min(tasks.length, 50)} onChange={event => setSelectedIds(event.target.checked ? sorted.slice(0, 50).map(task => task.id) : [])} /></th>}
                 {["任务", "状态", "负责人", "优先级", "截止日期", "里程碑"].map(
                   (label) => (
                     <th
@@ -142,7 +165,7 @@ export function TaskWorkspace(props: {
                 <tbody key={column.key}>
                   <tr className="border-t border-line bg-sunken/50">
                     <th
-                      colSpan={6}
+                      colSpan={selecting ? 7 : 6}
                       className="px-3 py-2 text-xs font-medium text-ink-soft"
                     >
                       {column.label} · {rows.length}
@@ -153,6 +176,7 @@ export function TaskWorkspace(props: {
                       key={task.id}
                       className={`border-t border-line hover:bg-sunken/50 ${task.id === taskId ? "bg-primary-soft" : ""}`}
                     >
+                      {selecting && <td className="px-3 py-3"><input type="checkbox" aria-label={`选择任务：${task.title}`} checked={selectedIds.includes(task.id)} disabled={selected.length >= 50 && !selectedIds.includes(task.id)} onChange={() => toggleTask(task.id)} /></td>}
                       <th
                         scope="row"
                         className="max-w-72 px-3 py-3 font-normal"

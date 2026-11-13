@@ -4,7 +4,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { updateTask, deleteTask, setTaskSuccessors } from "@/lib/task";
-import { createTaskWithIteration } from "@/lib/iteration";
+import { bulkUpdateTasks, createTaskWithIteration } from "@/lib/iteration";
+import type { BulkTaskUpdate, BulkTaskResult } from "@/contracts/task-bulk";
 import { setTaskLabels } from "@/lib/label";
 import { createMilestone } from "@/lib/project";
 import { AppError, ForbiddenError } from "@/lib/errors";
@@ -12,6 +13,22 @@ import { AppError, ForbiddenError } from "@/lib/errors";
 export type FormState = { error?: string; createdId?: string } | null;
 // 更新任务专用：成功回 { ok: true }，供编辑弹窗据以自闭
 export type UpdateTaskState = { error: string } | { ok: true } | null;
+
+export async function bulkUpdateTasksAction(projectId: string, input: BulkTaskUpdate): Promise<{ error: string } | BulkTaskResult> {
+  const session = await auth();
+  if (!session?.user) return { error: "请先登录" };
+  if (!z.uuid().safeParse(projectId).success) return { error: "项目参数无效" };
+  try {
+    const result = await bulkUpdateTasks(session.user.id, projectId, input);
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath(`/projects/${projectId}/iterations`);
+    revalidatePath("/dashboard");
+    return result;
+  } catch (error) {
+    if (error instanceof AppError) return { error: error.message };
+    return { error: "暂时无法确认修改结果，可重试同一次操作或刷新核对" };
+  }
+}
 
 const createTaskSchema = z.object({
   requestId: z.uuid().optional(), iterationId: z.uuid().optional(), iterationRevision: z.coerce.number().int().nonnegative().optional(),
