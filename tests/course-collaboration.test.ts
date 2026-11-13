@@ -15,7 +15,7 @@ import { createProjectReference } from "@/lib/project-extras";
 import { createTaskFromSource, getTaskOrigin, listMeetingFollowups } from "@/lib/source-tasks";
 import { getOrCreateScopedConversation } from "@/lib/agent/context";
 import { persistTurn } from "@/lib/agent/conversation";
-import { exportAssistantReport } from "@/lib/agent/report-document";
+import { buildReportDocument, exportAssistantReport } from "@/lib/agent/report-document";
 import { buildWorkflowContext } from "@/lib/agent/workflows";
 import { scanAndRecordDueReminders } from "@/lib/notification-reminders";
 import { listMyNotifications } from "@/lib/notification";
@@ -116,5 +116,12 @@ describe("课程协作增量与权限回归", () => {
     await scanAndRecordDueReminders(new Date("2026-11-12T04:00:00Z"));
     const notifications = await listMyNotifications(s.student.id, {});
     expect(notifications.items.some(item => item.summary?.includes("前置未完成：确认接口"))).toBe(true);
+  });
+  it("大表格导出保留超出排版范围的所有行列", async () => {
+    const wide = "|一|二|三|四|五|六|七|八|第九列保留|\n|---|---|---|---|---|---|---|---|---|\n|1|2|3|4|5|6|7|8|第九项内容|";
+    const long = "|项目|状态|\n|---|---|\n" + Array.from({ length: 205 }, (_, i) => `|第${i + 1}项|待办|`).join("\n");
+    const bytes = await buildReportDocument("完整导出", wide + "\n\n" + long, "课程项目");
+    const xml = strFromU8(unzipSync(bytes)["word/document.xml"]);
+    expect(xml).toContain("第九项内容"); expect(xml).toContain("第205项");
   });
 });

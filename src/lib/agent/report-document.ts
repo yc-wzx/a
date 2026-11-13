@@ -24,8 +24,13 @@ export async function buildReportDocument(title: string, content: string, projec
     if (!inCode && /^\s*\|/.test(line) && /^\s*\|?\s*:?-{3,}/.test(lines[index + 1] ?? "")) {
       const rows = [line]; index++;
       while (index + 1 < lines.length && /^\s*\|/.test(lines[index + 1])) rows.push(lines[++index]);
-      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: rows.slice(0, 200).map((row, rowIndex) =>
-        new TableRow({ tableHeader: rowIndex === 0, children: row.replace(/^\s*\||\|\s*$/g, "").split("|").slice(0, 8)
+      const cells = rows.map(row => row.replace(/^\s*\||\|\s*$/g, "").split("|"));
+      if (rows.length > 200 || cells.some(row => row.length > 8)) {
+        children.push(...rows.map(row => new Paragraph({ children: inlineText(row), spacing: { after: 120 } })));
+        continue;
+      }
+      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: cells.map((row, rowIndex) =>
+        new TableRow({ tableHeader: rowIndex === 0, children: row
           .map(cell => new TableCell({ children: [new Paragraph({ children: inlineText(cell.trim()) })] })) }),
       ) }));
       continue;
