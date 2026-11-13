@@ -2,7 +2,7 @@
 
 import { unbindFeishuAction } from "./actions";
 
-type Props = { boundName: string | null; boundAtLabel: string | null; notice: string | null };
+type Props = { boundName: string | null; boundAtLabel: string | null; notice: string | null; enabled: boolean };
 
 const NOTICE: Record<string, { text: string; ok: boolean }> = {
   bound: { text: "飞书绑定成功。", ok: true },
@@ -11,13 +11,13 @@ const NOTICE: Record<string, { text: string; ok: boolean }> = {
   error: { text: "绑定失败，请稍后重试。", ok: false },
 };
 
-export function FeishuCard({ boundName, boundAtLabel, notice }: Props) {
+export function FeishuCard({ boundName, boundAtLabel, notice, enabled }: Props) {
   const n = notice ? NOTICE[notice] : null;
   return (
     <section className="ac-card space-y-3 p-5">
       <h2 className="font-display text-base font-semibold text-ink">飞书通知</h2>
       <p className="text-sm text-ink-soft">
-        绑定飞书后，任务被指派、完成，以及临期/逾期时，你会收到飞书私信提醒。
+        服务启用并绑定账号后，可接收任务、审核和临期提醒，点击通知返回对应记录。
       </p>
       {n && (
         <p className={`text-sm ${n.ok ? "text-done" : "text-high"}`}>{n.text}</p>
@@ -32,7 +32,7 @@ export function FeishuCard({ boundName, boundAtLabel, notice }: Props) {
             <button type="submit" className="ac-btn-ghost text-sm">解绑</button>
           </form>
         </div>
-      ) : (
+      ) : enabled ? (
         <>
           {/* /api/auth/feishu/login 是 Route Handler 而非页面（规则误判）；OAuth 起点须整页跳转，
               走 next/link 的客户端路由会拿不到服务端 302。 */}
@@ -41,7 +41,7 @@ export function FeishuCard({ boundName, boundAtLabel, notice }: Props) {
             绑定飞书
           </a>
         </>
-      )}
+      ) : <p role="status" className="rounded-lg bg-sunken p-3 text-sm text-ink-soft">飞书服务待启用。管理员需要配置自建应用和本网站的授权回调地址。</p>}
     </section>
   );
 }

@@ -7,6 +7,7 @@ import { FeishuCard } from "./feishu-card";
 import { getMyNotificationChannels } from "@/lib/notification";
 import { getMyAiSettings } from "@/lib/agent/personal-settings";
 import { AiCard } from "./ai-card";
+import { getFeishuConfiguration } from "@/lib/feishu-configuration";
 
 function fmt(d: Date | null): string | null {
   if (!d) return null;
@@ -44,6 +45,7 @@ export default async function SettingsPage({
 
       <AiCard initial={aiSettings}/>
       <FeishuCard
+        enabled={getFeishuConfiguration().login}
         boundName={row?.feishuName ?? null}
         boundAtLabel={fmt(row?.feishuBoundAt ?? null)}
         notice={feishu ?? null}

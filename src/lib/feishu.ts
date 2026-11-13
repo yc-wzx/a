@@ -53,6 +53,7 @@ export async function exchangeOAuthCode(
   code: string,
 ): Promise<{ openId: string; name: string }> {
   const tokenRes = await fetch(`${BASE()}/open-apis/authen/v2/oauth/token`, {
+    signal: AbortSignal.timeout(10000),
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -75,6 +76,7 @@ export async function exchangeOAuthCode(
   }
 
   const infoRes = await fetch(`${BASE()}/open-apis/authen/v1/user_info`, {
+    signal: AbortSignal.timeout(10000),
     headers: { authorization: `Bearer ${tokenData.access_token}` },
   });
   const info = (await infoRes.json()) as {
@@ -123,6 +125,7 @@ export async function getJsapiTicket(): Promise<string> {
 
   const token = await getTenantAccessToken();
   const res = await fetch(`${BASE()}/open-apis/jssdk/ticket/get`, {
+    signal: AbortSignal.timeout(10000),
     method: "POST",
     headers: {
       "content-type": "application/json",

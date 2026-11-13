@@ -22,6 +22,12 @@ export function AiCard({ initial }: { initial: PersonalAiSummary }) {
     [notice, setNotice] = useState<string | null>(null),
     [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  function runRequest(operation: () => Promise<void>) {
+    start(async () => {
+      try { await operation(); }
+      catch { setError("网络连接中断，操作结果未确认。请保留输入，重试或刷新核对。"); }
+    });
+  }
   function choose(value: AiProviderId) {
     const preset = AI_PROVIDERS.find((p) => p.id === value)!;
     setProvider(value);
@@ -34,7 +40,7 @@ export function AiCard({ initial }: { initial: PersonalAiSummary }) {
     event.preventDefault();
     setError(null);
     setNotice(null);
-    start(async () => {
+    runRequest(async () => {
       const result = await saveMyAiSettingsAction({
         provider,
         baseUrl,
@@ -56,7 +62,7 @@ export function AiCard({ initial }: { initial: PersonalAiSummary }) {
   function test() {
     setError(null);
     setNotice(null);
-    start(async () => {
+    runRequest(async () => {
       const result = await testMyAiConnectionAction();
       if (!result.ok) setError(result.error);
       else
@@ -70,7 +76,7 @@ export function AiCard({ initial }: { initial: PersonalAiSummary }) {
       return;
     setError(null);
     setNotice(null);
-    start(async () => {
+    runRequest(async () => {
       const result = await clearMyAiSettingsAction(current.revision);
       if (!result.ok) {
         setError(result.error);

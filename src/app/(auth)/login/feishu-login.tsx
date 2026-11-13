@@ -29,36 +29,51 @@ declare global {
 }
 
 export function FeishuLogin() {
-  const [status, setStatus] = useState<"idle" | "silent" | "failed">("idle");
+  const [status, setStatus] = useState<"checking" | "unconfigured" | "unavailable" | "idle" | "silent" | "failed">("checking");
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.h5sdk) return;
-
+    const controller = new AbortController();
     const pageUrl = window.location.href.split("#")[0];
     (async () => {
-      setStatus("silent");
       try {
-        const res = await fetch(`/api/feishu/jssdk-config?url=${encodeURIComponent(pageUrl)}`);
+        const readiness = await fetch("/api/feishu/status", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
+        if (!readiness.ok) throw new Error("readiness unavailable");
+        const configuration = await readiness.json();
+        if (controller.signal.aborted) return;
+        if (!configuration.login) { setStatus("unconfigured"); return; }
+        if (!window.h5sdk || !window.tt) { setStatus("idle"); return; }
+        setStatus("silent");
+        const res = await fetch(`/api/feishu/jssdk-config?url=${encodeURIComponent(pageUrl)}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
         if (!res.ok) throw new Error("config fetch failed");
         const cfg = (await res.json()) as {
           appId: string; timestamp: number; nonceStr: string; signature: string;
         };
-        window.h5sdk!.config({ ...cfg, onFail: () => setStatus("failed") });
-        window.h5sdk!.error(() => setStatus("failed"));
+        if (controller.signal.aborted) return;
+        window.h5sdk!.config({ ...cfg, onFail: () => { if (!controller.signal.aborted) setStatus("failed"); } });
+        window.h5sdk!.error(() => { if (!controller.signal.aborted) setStatus("failed"); });
         window.h5sdk!.ready(() => {
+          if (controller.signal.aborted) return;
           window.tt!.requestAuthCode({
             appId: cfg.appId,
             success: async ({ code }) => {
-              await signIn("feishu", { code, redirectTo: "/teams" });
+              if (controller.signal.aborted) return;
+              try { await signIn("feishu", { code, redirectTo: "/teams" }); }
+              catch { if (!controller.signal.aborted) setStatus("failed"); }
             },
             fail: () => setStatus("failed"),
           });
         });
       } catch {
-        setStatus("failed");
+        if (!controller.signal.aborted) setStatus(window.h5sdk ? "failed" : "unavailable");
       }
     })();
-  }, []);
+    return () => controller.abort();
+  }, [reload]);
+
+  if (status === "checking") return <p role="status" className="text-center text-xs text-ink-soft">正在检查飞书登录…</p>;
+  if (status === "unconfigured") return <p className="text-center text-xs text-ink-faint">飞书登录待管理员启用</p>;
+  if (status === "unavailable") return <p role="alert" className="text-center text-xs text-high">飞书状态读取失败。<button type="button" className="ml-2 underline" onClick={() => { setStatus("checking"); setReload(value => value + 1); }}>重试</button></p>;
 
   if (status === "silent") {
     return <p className="text-center text-sm text-ink-soft">正在通过飞书登录…</p>;
