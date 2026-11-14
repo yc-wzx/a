@@ -8,6 +8,8 @@ import { projectAttachments as attachments } from "@/db/course-extensions-schema
 import { projects, teamMembers, tasks, deliverables } from "@/db/schema";
 import { projectDocuments, documentGrants } from "@/db/documents-schema";
 import { AppError, ConflictError, ForbiddenError, ValidationError } from "./errors";
+import { inferMaterialPurpose, MATERIAL_PURPOSES } from "./material-purpose";
+import { claimWriteRequest, finishWriteRequest, hashRequest } from "./write-request";
 
 export const attachmentTargetSchema = z.object({ projectId: z.uuid(), targetType: z.enum(["project","task","document","deliverable"]), targetId: z.uuid() });
 export type AttachmentTarget = z.infer<typeof attachmentTargetSchema>;
@@ -22,6 +24,13 @@ export function detectAttachmentType(name: string, body: Buffer): string {
   if (ext === ".gif" && /^GIF8[79]a$/.test(body.subarray(0,6).toString("ascii"))) return "image/gif";
   if (ext === ".webp" && body.subarray(0,4).toString() === "RIFF" && body.subarray(8,12).toString() === "WEBP") return "image/webp";
   if (ext === ".pdf" && body.subarray(0,5).toString() === "%PDF-") return "application/pdf";
+  if (ext === ".zip" && body.length >= 22 && [0x04034b50, 0x06054b50].includes(body.readUInt32LE(0))) {
+    for (let offset = body.length - 22; offset >= Math.max(0, body.length - 65557); offset--) {
+      if (body.readUInt32LE(offset) !== 0x06054b50) continue;
+      const directorySize = body.readUInt32LE(offset + 12), directoryOffset = body.readUInt32LE(offset + 16);
+      if (offset + 22 + body.readUInt16LE(offset + 20) === body.length && directoryOffset + directorySize <= offset) return "application/zip";
+    }
+  }
   const office: Record<string,[string,string]> = { ".pptx": ["ppt/", "application/vnd.openxmlformats-officedocument.presentationml.presentation"], ".docx": ["word/", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"], ".xlsx": ["xl/", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] };
   if (office[ext] && body.length >= 22 && body.readUInt32LE(0) === 0x04034b50) {
     // Inspect bounded ZIP central directory filenames; never extract or execute an archive.
@@ -43,7 +52,7 @@ export function detectAttachmentType(name: string, body: Buffer): string {
   if ([".txt",".md",".csv"].includes(ext) && !body.includes(0)) {
     try { new TextDecoder("utf-8", { fatal: true }).decode(body); return "text/plain; charset=utf-8"; } catch { /* reject mislabeled binary */ }
   }
-  throw new ValidationError("请选择有效的图片、PDF、PPT、Word、Excel 或 UTF-8 文本文件，不支持可执行文件和宏文档");
+  throw new ValidationError("请选择有效的图片、PDF、PPT、Word、Excel、ZIP 或 UTF-8 文本文件，不支持可执行文件和宏文档");
 }
 async function targetAccess(tx: DbTx, actorId: string, target: AttachmentTarget, write = false) {
   const [p] = await tx.select({ status: projects.status, role: teamMembers.role }).from(projects).innerJoin(teamMembers,eq(teamMembers.teamId,projects.teamId)).where(and(eq(projects.id,target.projectId),eq(teamMembers.userId,actorId))).for("share");
@@ -65,7 +74,24 @@ async function targetAccess(tx: DbTx, actorId: string, target: AttachmentTarget,
 }
 function dto(row: typeof attachments.$inferSelect, actorId: string, role: string, archived: boolean) {
   const { storageKey, digest, requestId, ...rest } = row; void storageKey; void digest; void requestId;
-  return { ...rest, createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null, href: `/api/attachments/${row.id}`, canDelete: !archived && !row.publishedAt && (row.ownerId === actorId || role === "admin") };
+  const canManage = !archived && !row.publishedAt && (row.ownerId === actorId || role === "admin");
+  return { ...rest, materialPurpose: row.materialPurpose ?? inferMaterialPurpose(row.filename), createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null, href: `/api/attachments/${row.id}`, canDelete: canManage, canClassify: canManage };
+}
+
+export async function updateAttachmentPurpose(actorId: string, attachmentId: string, input: unknown) {
+  z.uuid().parse(attachmentId);
+  const data = z.strictObject({ requestId: z.uuid(), expectedRevision: z.number().int().positive(), materialPurpose: z.enum(MATERIAL_PURPOSES).nullable() }).parse(input);
+  return db.transaction(async tx => {
+    const [row] = await tx.select().from(attachments).where(eq(attachments.id, attachmentId)).for("update");
+    if (!row || row.deletedAt) throw new ForbiddenError("附件不存在或无权查看");
+    const access = await targetAccess(tx, actorId, row, true);
+    if (row.publishedAt || row.ownerId !== actorId && access.role !== "admin") throw new ForbiddenError("只能调整自己上传的未发布材料，或由管理员调整");
+    const claim = await claimWriteRequest(tx, { actorId, projectId: row.projectId, operation: "attachment.purpose", requestId: data.requestId }, hashRequest({ attachmentId, ...data }));
+    if (claim.replay) return claim.result as ReturnType<typeof dto>;
+    if (row.revision !== data.expectedRevision) throw new ConflictError("材料分类已更新，请重新加载后再调整");
+    const [updated] = await tx.update(attachments).set({ materialPurpose: data.materialPurpose, revision: row.revision + 1 }).where(eq(attachments.id, row.id)).returning();
+    return finishWriteRequest(tx, claim.id, dto(updated, actorId, access.role, false));
+  });
 }
 export async function listAttachments(actorId: string, input: unknown) {
   const target = attachmentTargetSchema.parse(input);

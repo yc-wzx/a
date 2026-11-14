@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
-import { AppError, ForbiddenError } from "@/lib/errors";
-import { deleteAttachment, readAttachment } from "@/lib/attachments";
+import { AppError, ConflictError, ForbiddenError } from "@/lib/errors";
+import { deleteAttachment, readAttachment, updateAttachmentPurpose } from "@/lib/attachments";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = {params:Promise<{attachmentId:string}>};
@@ -25,4 +25,17 @@ export async function DELETE(request:Request,context:Context) {
   if (!origin || ![new URL(request.url).origin,process.env.AUTH_URL && new URL(process.env.AUTH_URL).origin,process.env.AGILECAMPUS_URL && new URL(process.env.AGILECAMPUS_URL).origin].includes(origin)) return Response.json({error:"没有权限"},{status:403});
   try { await deleteAttachment(session.user.id,(await context.params).attachmentId); return Response.json({ok:true}); }
   catch(error) { return Response.json({error:error instanceof AppError ? error.message : "删除失败"},{status:403}); }
+}
+export async function PATCH(request: Request, context: Context) {
+  const session = await auth();
+  if (!session?.user) return Response.json({ error: "请先登录" }, { status: 401 });
+  const origin = request.headers.get("origin");
+  const allowed = [new URL(request.url).origin, process.env.AUTH_URL && new URL(process.env.AUTH_URL).origin, process.env.AGILECAMPUS_URL && new URL(process.env.AGILECAMPUS_URL).origin];
+  if (!origin || !allowed.includes(origin)) return Response.json({ error: "没有权限" }, { status: 403 });
+  try {
+    const result = await updateAttachmentPurpose(session.user.id, (await context.params).attachmentId, await request.json());
+    return Response.json(result, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return Response.json({ error: error instanceof AppError ? error.message : "材料分类保存失败，请重新加载后重试" }, { status: error instanceof ForbiddenError ? 403 : error instanceof ConflictError ? 409 : 400 });
+  }
 }

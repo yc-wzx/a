@@ -12,6 +12,14 @@ const read = (href: string) => {
 };
 
 describe("task previews preserve the originating page", () => {
+  it("opens materials in the existing preview and clears its section when opening an ordinary task", () => {
+    const selected = { ...target, section: "materials" as const };
+    const href = taskPreviewHref("/dashboard?view=mine", selected);
+    expect(read(href)).toEqual(selected);
+    expect(taskTargetFromHref(`/projects/${projectId}?task=${taskId}&taskSection=materials`)).toEqual(selected);
+    expect(withoutTaskPreview(href)).toBe("/dashboard?view=mine");
+    expect(taskPreviewHref(href, target)).not.toContain("taskSection");
+  });
   it("opens a workspace task without losing pagination and scroll anchor", () => {
     const href = taskPreviewHref("/dashboard?revisionsOffset=50#tasks", target);
     const url = new URL(href, "https://example.invalid");

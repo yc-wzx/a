@@ -8,6 +8,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from ".
 import { getProjectForUser } from "./project";
 import { claimWriteRequest, finishWriteRequest, hashRequest } from "./write-request";
 import { recordProjectActivity } from "./activity";
+import { inferMaterialPurpose, MATERIAL_PURPOSES } from "./material-purpose";
 
 const identity = z.strictObject({ actorId: z.uuid(), projectId: z.uuid(), taskId: z.uuid().optional() });
 const request = z.uuid();
@@ -78,10 +79,10 @@ export async function getTaskEnhancements(actorId: string, projectId: string, ta
   for (const link of links) {
     if (link.resourceId) {
       const source = linkedResources.find((row) => row.id === link.resourceId);
-      if (source) materials.push({ id: link.id, sourceId: source.id, title: source.title, kind: "resource", href: /^https?:\/\//i.test(source.url) ? source.url : `/projects/${projectId}/references`, revision: link.revision });
+      if (source) materials.push({ id: link.id, sourceId: source.id, title: source.title, kind: "resource", href: /^https?:\/\//i.test(source.url) ? source.url : `/projects/${projectId}/references`, revision: link.revision, materialPurpose: link.materialPurpose ?? inferMaterialPurpose(source.title, source.url) });
     } else if (link.deliverableVersionId) {
       const source = linkedVersions.find((row) => row.id === link.deliverableVersionId);
-      if (source) materials.push({ id: link.id, sourceId: source.id, title: `${source.title} · 正式版本 ${source.number}`, kind: "deliverable", href: `/projects/${projectId}/deliverables/${source.deliverableId}?versionId=${source.id}`, revision: link.revision });
+      if (source) materials.push({ id: link.id, sourceId: source.id, title: `${source.title} · 正式版本 ${source.number}`, kind: "deliverable", href: `/projects/${projectId}/deliverables/${source.deliverableId}?versionId=${source.id}`, revision: link.revision, materialPurpose: link.materialPurpose ?? inferMaterialPurpose(source.title) });
     }
   }
   return { taskId, checklist, watching: watchers.some((w) => w.userId === actorId), watchCount: watchers.length,
@@ -193,5 +194,17 @@ export async function unlinkTaskMaterial(actorId: string, projectId: string, tas
     await tx.delete(taskMaterialLinks).where(eq(taskMaterialLinks.id, link.id));
     await recordEnhancement(tx, actorId, projectId, taskId, data.requestId, "task.material.unlinked", "解除了任务资料关联");
     return { deletedId: link.id };
+  });
+}
+
+export async function updateTaskMaterialPurpose(actorId: string, projectId: string, taskId: string, input: unknown) {
+  const data = z.strictObject({ requestId: request, linkId: z.uuid(), expectedRevision: revision, materialPurpose: z.enum(MATERIAL_PURPOSES).nullable() }).parse(input);
+  return mutate(actorId, projectId, taskId, data.requestId, "task.material.purpose", data, "task", async tx => {
+    const [link] = await tx.select().from(taskMaterialLinks).where(and(eq(taskMaterialLinks.id, data.linkId), eq(taskMaterialLinks.taskId, taskId))).for("update");
+    if (!link) throw new NotFoundError("资料关联不存在");
+    if (link.revision !== data.expectedRevision) throw new ConflictError("材料分类已更新，请重新加载后再调整");
+    await tx.update(taskMaterialLinks).set({ materialPurpose: data.materialPurpose, revision: link.revision + 1 }).where(eq(taskMaterialLinks.id, link.id));
+    await recordEnhancement(tx, actorId, projectId, taskId, data.requestId, "task.material.purpose", "调整了任务材料用途");
+    return { id: link.id };
   });
 }

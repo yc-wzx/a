@@ -20,6 +20,8 @@ import {
 import type { GroupBy } from "@/lib/board-filters";
 import { moveTaskAction } from "./actions";
 import { TaskCard, type Option } from "./task-card";
+import type { MaterialSummary } from "@/lib/material-purpose";
+import { openTaskPreview } from "@/lib/task-navigation";
 
 const columnCoordinates: KeyboardCoordinateGetter = (event, { currentCoordinates, context }) => {
   if (!["ArrowLeft", "ArrowRight"].includes(event.code)) return;
@@ -33,6 +35,7 @@ const columnCoordinates: KeyboardCoordinateGetter = (event, { currentCoordinates
 };
 
 export type BoardTask = {
+  materialSummary?: MaterialSummary;
   assignees?: { id: string; name: string }[];
   id: string;
   title: string;
@@ -56,6 +59,7 @@ function Column({
   allTasks,
   dependencies,
   onOpenTask,
+  onOpenMaterials,
   columns, onMove, doingLimit,
 }: {
   column: BoardColumn;
@@ -64,6 +68,7 @@ function Column({
   allTasks: { id: string; title: string }[];
   dependencies: { predecessorId: string; successorId: string }[];
   onOpenTask: (taskId: string) => void;
+  onOpenMaterials: (taskId: string) => void;
   columns: BoardColumn[]; onMove: (taskId: string, columnKey: string) => void;
   doingLimit?: { doingLimit: number | null; doingCount: number; exceeded: boolean };
 }) {
@@ -93,6 +98,7 @@ function Column({
           allTasks={allTasks}
           dependencies={dependencies}
           onOpen={() => onOpenTask(t.id)}
+          onOpenMaterials={() => onOpenMaterials(t.id)}
           columns={columns} onMove={onMove}
         />
       ))}
@@ -176,6 +182,7 @@ export function Board({
             allTasks={allTasks}
             dependencies={dependencies}
             onOpenTask={onOpenTask}
+            onOpenMaterials={taskId => openTaskPreview(`/projects/${projectId}?task=${taskId}&taskSection=materials`)}
             columns={columns} onMove={move} doingLimit={groupBy === "status" ? doingLimit : undefined}
           />
         ))}

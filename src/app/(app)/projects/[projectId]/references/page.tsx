@@ -15,6 +15,8 @@ import { SourceTaskButton } from "@/components/tasks/source-task";
 import { TaskLink } from "@/components/tasks/task-link";
 import { listMeetingFollowups } from "@/lib/source-tasks";
 import { AttachmentOverview } from "@/components/attachments/attachment-overview";
+import { listMeetingDecisions } from "@/lib/meeting-decisions";
+import { MeetingDecisions } from "@/components/projects/meeting-decisions";
 
 export default async function ReferencesPage({
   params,
@@ -43,8 +45,11 @@ export default async function ReferencesPage({
     listProjectMilestones(session.user.id, projectId),
   ]);
   const path = "/projects/" + projectId + "/references";
-  const followups = await listMeetingFollowups(session.user.id, projectId,
-    references.items.filter(record => record.type === "meeting").map(record => record.id));
+  const meetingIds = references.items.filter(record => record.type === "meeting").map(record => record.id);
+  const [followups, decisions] = await Promise.all([
+    listMeetingFollowups(session.user.id, projectId, meetingIds),
+    listMeetingDecisions(session.user.id, projectId, meetingIds),
+  ]);
   return (
     <main className="mx-auto max-w-5xl space-y-6 py-8">
       <ProjectNav projectId={projectId} current="references" />
@@ -125,6 +130,7 @@ export default async function ReferencesPage({
                 {record.note}
               </p>
             )}
+            {record.type === "meeting" && <MeetingDecisions projectId={projectId} referenceId={record.id} items={decisions.filter(item => item.referenceId === record.id)} members={members.map(member => ({ id: member.id, name: member.name }))} canCreate={access.project.status !== "archived"} />}
             {record.type === "meeting" && <section className="space-y-3 border-t border-line pt-3" aria-label={`${record.title}后续任务`}>
               <h3 className="text-sm font-medium">会议后续任务</h3>
               {followups.filter(task => task.meetingId === record.id).map(task => <TaskLink key={task.id}

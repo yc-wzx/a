@@ -1,5 +1,5 @@
 export type ChecklistItem = { id: string; text: string; checked: boolean; revision: number };
-export type TaskMaterial = { id: string; title: string; kind: "resource" | "deliverable"; href: string; revision: number; sourceId: string };
+export type TaskMaterial = { id: string; title: string; kind: "resource" | "deliverable"; href: string; revision: number; sourceId: string; materialPurpose?: import("@/lib/material-purpose").MaterialPurpose };
 export type MaterialOption = { id: string; title: string; kind: "resource" | "deliverable" };
 export type TaskEnhancements = {
   taskId: string;
