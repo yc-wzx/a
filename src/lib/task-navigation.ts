@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export type TaskTarget = { projectId: string; taskId: string; commentId?: string };
+export type TaskTarget = { projectId: string; taskId: string; commentId?: string; section?: "materials" };
 const base = "https://agilecampus.invalid";
 
 function projectFromPath(pathname: string): string | null {
@@ -18,7 +18,8 @@ export function taskPreviewTarget(
     return null;
   const commentId = search.get("comment");
   return { projectId: projectId!, taskId: taskId!,
-    ...(z.uuid().safeParse(commentId).success ? { commentId: commentId! } : {}) };
+    ...(z.uuid().safeParse(commentId).success ? { commentId: commentId! } : {}),
+    ...(search.get("taskSection") === "materials" ? { section: "materials" as const } : {}) };
 }
 
 export function taskTargetFromHref(href: string): TaskTarget | null {
@@ -33,6 +34,8 @@ export function taskPreviewHref(source: string, target: TaskTarget): string {
   url.searchParams.set("task", target.taskId);
   if (target.commentId) url.searchParams.set("comment", target.commentId);
   else url.searchParams.delete("comment");
+  if (target.section) url.searchParams.set("taskSection", target.section);
+  else url.searchParams.delete("taskSection");
   if (projectFromPath(url.pathname) === target.projectId)
     url.searchParams.delete("taskProject");
   else url.searchParams.set("taskProject", target.projectId);
@@ -44,6 +47,7 @@ export function withoutTaskPreview(source: string): string {
   url.searchParams.delete("task");
   url.searchParams.delete("taskProject");
   url.searchParams.delete("comment");
+  url.searchParams.delete("taskSection");
   return url.pathname + url.search + url.hash;
 }
 

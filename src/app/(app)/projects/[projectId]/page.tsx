@@ -19,6 +19,7 @@ import Link from "next/link";
 import { listProjectIterations } from "@/lib/iteration";
 import { getProjectDoingLimit } from "@/lib/task-enhancements";
 import { ProjectDoingLimitControl } from "@/components/tasks/project-doing-limit";
+import { listTaskMaterialSummaries } from "@/lib/task-material-summary";
 
 export default async function ProjectPage({
   params,
@@ -64,6 +65,7 @@ export default async function ProjectPage({
   );
   const today = todayInShanghai();
   const visibleTasks = applyFilters(projectTasks, filters, today);
+  const materialSummaries = await listTaskMaterialSummaries(session.user.id, projectId, visibleTasks.map(task => task.id));
 
   const canWrite =
     (role === "admin" || role === "student") && project.status !== "archived";
@@ -127,6 +129,7 @@ export default async function ProjectPage({
           groupBy={filters.group}
           tasks={visibleTasks.map((t) => ({
             id: t.id,
+            materialSummary: materialSummaries[t.id],
             title: t.title,
             description: t.description,
             completionNote: t.completionNote,

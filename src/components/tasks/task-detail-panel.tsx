@@ -21,7 +21,6 @@ import { TaskOutcome } from "./task-outcome";
 import { MemberPicker } from "./member-picker";
 import { TaskEnhancementSection } from "./task-enhancements";
 import { TaskDocumentLinks } from "@/components/documents/task-document-links";
-import { ProjectAttachments } from "@/components/attachments/project-attachments";
 import { TaskOrigin } from "@/components/tasks/source-task";
 
 // C / P0：任务详情侧边栏。取代原先卡片里的居中弹窗 EditModal。
@@ -315,7 +314,6 @@ export function TaskDetailPanel({
               <TaskEnhancementSection key={`enhancements-${taskId}`} projectId={projectId} taskId={taskId} onSaved={onSaved} />
               <TaskDocumentLinks key={`docs-${taskId}`} projectId={projectId} taskId={taskId} />
               <TaskOrigin projectId={projectId} taskId={taskId} />
-              <details className="border-t border-line pt-3"><summary className="cursor-pointer text-sm text-ink-soft">附件与文件</summary><div className="pt-4"><ProjectAttachments projectId={projectId} targetType="task" targetId={taskId} canUpload={canWrite && local.allowedActions.edit} /></div></details>
               <p className="text-xs text-ink-faint">子任务 {local.subtaskProgress.doneCount}/{local.subtaskProgress.total} · 依赖 {local.dependencies.length} 条 · {task.iterationId ? "已加入迭代" : "未加入迭代"}</p>
               <details className="border-t border-line pt-3"><summary className="cursor-pointer text-sm text-ink-soft">标签、依赖与阻塞</summary><div className="mt-3 space-y-4">{local.labels.map(l => <span key={l.id} className="ac-badge mr-2">{l.name}</span>)}
                 {canWrite && local.allowedActions.edit && <><BlockControl projectId={projectId} taskId={task.id} task={task} onUpdated={next => setLocal(current => current ? { ...current, task: next } : current)} onReload={() => { refetch(); onSaved?.(); }} /><LabelDependencyForm key={`associations-${task.updatedAt}`} projectId={projectId} taskId={task.id} expectedUpdatedAt={task.updatedAt} currentLabelIds={local.labels.map(l => l.id)} currentSuccessorIds={local.dependencies.filter(d => d.predecessorId === task.id).map(d => d.successorId)} allLabels={allLabels} allTasks={allTasks} onSaved={handleLabelDependencySaved} /></>}

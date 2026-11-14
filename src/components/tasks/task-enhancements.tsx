@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Bell, CheckSquare, Link2, Pencil, Trash2 } from "lucide-react";
+import { Bell, CheckSquare, Pencil, Trash2 } from "lucide-react";
 import type { Result } from "@/contracts/p0-p2";
 import type { ChecklistItem, TaskEnhancements as EnhancementData } from "@/contracts/task-enhancements";
-import { addChecklistItemAction, deleteChecklistItemAction, getTaskEnhancementsAction, linkTaskMaterialAction, setTaskWatchingAction, unlinkTaskMaterialAction, updateChecklistItemAction } from "@/app/(app)/projects/[projectId]/tasks/enhancement-actions";
+import { addChecklistItemAction, deleteChecklistItemAction, getTaskEnhancementsAction, linkTaskMaterialAction, setTaskWatchingAction, unlinkTaskMaterialAction, updateChecklistItemAction, updateTaskMaterialPurposeAction } from "@/app/(app)/projects/[projectId]/tasks/enhancement-actions";
+import { ProjectAttachments } from "@/components/attachments/project-attachments";
 import { newRequestId } from "@/lib/request-id";
 
 export function TaskEnhancementSection({ projectId, taskId, onSaved }: { projectId: string; taskId: string; onSaved?: () => void }) {
@@ -12,7 +13,6 @@ export function TaskEnhancementSection({ projectId, taskId, onSaved }: { project
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
   const [text, setText] = useState("");
-  const [source, setSource] = useState("");
   const [pending, startTransition] = useTransition();
   useEffect(() => {
     let cancelled = false;
@@ -42,9 +42,16 @@ export function TaskEnhancementSection({ projectId, taskId, onSaved }: { project
     {error && <button type="button" className="ac-btn-ghost text-sm" onClick={() => setNonce((n) => n + 1)}>重试</button>}
   </section>;
   const done = data.checklist.filter((item) => item.checked).length;
-  const linked = new Set(data.materials.map((m) => `${m.kind}:${m.sourceId}`));
-  const available = data.materialOptions.filter((m) => !linked.has(`${m.kind}:${m.id}`));
   return <section className="space-y-4 border-t border-line pt-4" aria-label="任务检查清单与关联资料">
+    <ProjectAttachments projectId={projectId} targetType="task" targetId={taskId} canUpload={data.canWrite} onChanged={onSaved} taskMaterials={{
+      materials: data.materials,
+      materialOptions: data.materialOptions,
+      canWrite: data.canWrite,
+      pending,
+      onLink: option => run(() => linkTaskMaterialAction(projectId, taskId, { requestId: newRequestId(), kind: option.kind, sourceId: option.id })),
+      onUnlink: item => run(() => unlinkTaskMaterialAction(projectId, taskId, { requestId: newRequestId(), linkId: item.id, expectedRevision: item.revision })),
+      onPurposeChange: (item, materialPurpose) => run(() => updateTaskMaterialPurposeAction(projectId, taskId, { requestId: newRequestId(), linkId: item.id, expectedRevision: item.revision, materialPurpose })),
+    }} />
     <div className="flex items-center justify-between gap-2">
       <button type="button" disabled={pending || !data.canWatch} onClick={() => run(() => setTaskWatchingAction(projectId, taskId, { requestId: newRequestId(), watching: !data.watching }))}
         className={`ac-btn-ghost flex items-center gap-1.5 text-sm ${data.watching ? "text-primary" : ""}`} aria-pressed={data.watching}>
@@ -69,22 +76,6 @@ export function TaskEnhancementSection({ projectId, taskId, onSaved }: { project
       {data.canWrite && <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); if (text.trim()) run(() => addChecklistItemAction(projectId, taskId, { requestId: newRequestId(), text }), () => setText("")); }}>
         <input className="ac-field min-w-0 flex-1 text-sm" aria-label="新检查项" placeholder="例如：异常流程已测试" value={text} maxLength={500} disabled={pending} onChange={(event) => setText(event.target.value)} />
         <button className="ac-btn-ghost shrink-0 text-sm" disabled={pending || !text.trim() || data.checklist.length >= 50}>添加</button>
-      </form>}
-    </div>
-    <div className="space-y-2">
-      <h4 className="flex items-center gap-1.5 text-sm font-medium text-ink"><Link2 size={15} aria-hidden="true" />关联资料</h4>
-      {!data.materials.length && <p className="text-xs text-ink-soft">关联已有会议资料或正式成果版本，便于完成任务时查看。</p>}
-      <ul className="space-y-2">{data.materials.map((material) => <li key={material.id} className="flex items-start gap-2 rounded-field bg-sunken p-2 text-sm">
-        <a href={material.href} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 break-words text-primary hover:underline">{material.title} ↗</a>
-        {data.canWrite && <button type="button" className="shrink-0 text-xs text-ink-soft hover:text-high" disabled={pending} onClick={() => run(() => unlinkTaskMaterialAction(projectId, taskId, { requestId: newRequestId(), linkId: material.id, expectedRevision: material.revision }))} aria-label={`解除关联：${material.title}`}>解除</button>}
-      </li>)}</ul>
-      {data.canWrite && available.length > 0 && <form className="flex gap-2" onSubmit={(event) => {
-        event.preventDefault(); const option = available.find((m) => `${m.kind}:${m.id}` === source); if (option) run(() => linkTaskMaterialAction(projectId, taskId, { requestId: newRequestId(), kind: option.kind, sourceId: option.id }), () => setSource(""));
-      }}>
-        <select aria-label="选择关联资料" className="ac-field min-w-0 flex-1 text-sm" value={source} disabled={pending} onChange={(event) => setSource(event.target.value)}>
-          <option value="">选择项目资料或成果版本</option>
-          {available.map((option) => <option key={`${option.kind}:${option.id}`} value={`${option.kind}:${option.id}`}>{option.kind === "resource" ? "资料" : "成果"} · {option.title}</option>)}
-        </select><button className="ac-btn-ghost shrink-0 text-sm" disabled={pending || !source || data.materials.length >= 50}>关联</button>
       </form>}
     </div>
     {error && <p role="alert" className="text-sm text-high">{error}</p>}

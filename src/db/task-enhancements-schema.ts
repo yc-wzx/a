@@ -32,6 +32,7 @@ export const taskMaterialLinks = pgTable("task_material_links", {
   resourceId: uuid("resource_id").references(() => projectReferences.id, { onDelete: "cascade" }),
   deliverableVersionId: uuid("deliverable_version_id").references(() => deliverableVersions.id, { onDelete: "cascade" }),
   revision: integer("revision").notNull().default(1),
+  materialPurpose: text("material_purpose").$type<import("@/lib/material-purpose").MaterialPurpose>(),
   createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

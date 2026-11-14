@@ -110,7 +110,7 @@ async function claim(
     : null;
 }
 
-async function access(
+export async function referenceProjectAccess(
   tx: DbTx,
   actorId: string,
   projectId: string,
@@ -142,7 +142,6 @@ async function access(
     throw new AppError("项目已归档，不能修改");
   return { project, role: member.role };
 }
-
 async function related(
   tx: DbTx,
   projectId: string,
@@ -212,7 +211,7 @@ export async function createProjectReference(
     .update(JSON.stringify({ actorId, projectId, ...value }))
     .digest("hex");
   return db.transaction(async (tx) => {
-    const { project, role } = await access(tx, actorId, projectId, true);
+    const { project, role } = await referenceProjectAccess(tx, actorId, projectId, true);
     const request = await claim(
       tx,
       actorId,
@@ -274,7 +273,7 @@ export async function updateProjectReference(
   parse(uuid, id);
   const { expectedRevision, requestId, ...value } = parse(updateSchema, input);
   return db.transaction(async (tx) => {
-    const { project, role } = await access(tx, actorId, projectId, true);
+    const { project, role } = await referenceProjectAccess(tx, actorId, projectId, true);
     const [row] = await tx
       .select()
       .from(projectReferences)
@@ -321,7 +320,7 @@ export async function deleteProjectReference(
   parse(revision, expectedRevision);
   if (requestId !== undefined) parse(uuid, requestId);
   return db.transaction(async (tx) => {
-    const { role } = await access(tx, actorId, projectId, true);
+    const { role } = await referenceProjectAccess(tx, actorId, projectId, true);
     const request = await claim(
       tx,
       actorId,
@@ -378,7 +377,7 @@ export async function listProjectReferences(
     input,
   );
   return readProject(actorId, projectId, async (tx) => {
-    const { project, role } = await access(tx, actorId, projectId);
+    const { project, role } = await referenceProjectAccess(tx, actorId, projectId);
     const condition = and(
       eq(projectReferences.projectId, projectId),
       options.referenceId ? eq(projectReferences.id, options.referenceId) : undefined,
@@ -419,7 +418,7 @@ export async function setProjectLeader(
     input,
   );
   return db.transaction(async (tx) => {
-    const { project, role } = await access(tx, actorId, projectId, true, false);
+    const { project, role } = await referenceProjectAccess(tx, actorId, projectId, true, false);
     if (role !== "admin") throw new ForbiddenError();
     const [locked] = await tx
       .select()
@@ -496,7 +495,7 @@ export async function setProjectLeader(
 
 export async function getProjectLeadership(actorId: string, projectId: string) {
   return readProject(actorId, projectId, async (tx) => {
-    const { project } = await access(tx, actorId, projectId);
+    const { project } = await referenceProjectAccess(tx, actorId, projectId);
     const [leader] = project.leaderId
       ? await tx
           .select({ name: users.name, memberId: teamMembers.id })

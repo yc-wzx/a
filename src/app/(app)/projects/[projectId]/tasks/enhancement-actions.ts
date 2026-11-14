@@ -2,12 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { runAction } from "@/lib/action-result";
+import { updateTaskMaterialPurpose } from "@/lib/task-enhancements";
 import { addChecklistItem, deleteChecklistItem, getTaskEnhancements, linkTaskMaterial, setProjectDoingLimit, setTaskWatching, unlinkTaskMaterial, updateChecklistItem } from "@/lib/task-enhancements";
 
 function refresh(projectId: string) { revalidatePath(`/projects/${projectId}`); }
 
 export async function getTaskEnhancementsAction(projectId: string, taskId: string) {
   return runAction((actorId) => getTaskEnhancements(actorId, projectId, taskId));
+}
+export async function updateTaskMaterialPurposeAction(projectId: string, taskId: string, input: unknown) {
+  const result = await runAction(actorId => updateTaskMaterialPurpose(actorId, projectId, taskId, input));
+  if (result.ok) refresh(projectId);
+  return result;
 }
 export async function addChecklistItemAction(projectId: string, taskId: string, input: { requestId: string; text: string }) {
   const result = await runAction((actorId) => addChecklistItem(actorId, projectId, taskId, input));

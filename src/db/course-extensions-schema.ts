@@ -13,6 +13,8 @@ export const projectAttachments = pgTable("project_attachments", {
   storageKey: text("storage_key").notNull(),
   digest: text("digest").notNull(),
   requestId: uuid("request_id").notNull(),
+  materialPurpose: text("material_purpose").$type<import("@/lib/material-purpose").MaterialPurpose>(),
+  revision: integer("revision").notNull().default(1),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
