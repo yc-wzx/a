@@ -193,7 +193,7 @@ export function ProjectAttachments({
       tabIndex={taskMaterials ? -1 : undefined}
       className={
         taskMaterials
-          ? "scroll-mt-4 space-y-3 border-t border-line pt-4 outline-none"
+          ? "scroll-mt-4 space-y-3 outline-none"
           : "space-y-3 rounded-xl border border-line p-4"
       }
       aria-label={taskMaterials ? "交付材料" : "附件"}
